@@ -1,0 +1,66 @@
+; OWNER.A - implementation module for class OwnerObject
+
+;		include	"owner.i"
+;		include "aclass.i"
+
+
+
+		begin
+ownerobject	entry
+		AbstractClass	classname, construct, destruct
+
+classname:	  db	"OwnerObject", 0
+
+
+	; OwnerObject constructor
+	; On entry:
+	;	x = class
+	;	y = new object
+	;	u = stack argument pointer
+
+construct:	begin
+		  pshs	d,x
+
+		  ldx	[AbstractClass.superclass,x]	; get superclass
+		  construct			; call superclass constructor
+
+		  ldd	#0			; set list to NULL
+		  std	OwnerObject.owned_list,y
+
+		  puls	d,x,pc
+		end
+
+
+	; OwnedObject destructor
+	; On entry:
+	;	x = class
+	;	y = object being destroyed
+
+destruct:	begin
+		  pshs	x
+		  pshs	x,cc
+		  seif				; disable interrupts
+
+		  ; destroy all objects in owned list
+loop:		  ldx	OwnerObject.owned_list,y
+		  beq	out
+
+		  destroy
+		  bra	loop
+
+out:		  puls	x,cc			; restore int. status
+		  ldx	[AbstractClass.superclass,x]	; get superclass
+		  destruct			; call superclass destructor
+
+		  puls	x,pc
+		end
+
+
+		begin
+objectinit:	    bra		init
+
+init		    redef	intinit
+		end
+
+		end
+	

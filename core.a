@@ -1,0 +1,30 @@
+; CORE.A - main file for core classes
+
+		org	0
+		exec	init
+next:		dw	0		; init chaining pointer
+
+		include	"macros.i"
+		include	"init.i"
+		include	"object.i"
+		include	"owned.i"
+		include	"owner.i"
+		include	"named.i"
+		include	"shared.i"
+		include	"class.i"
+		include	"aclass.i"
+		include	"nclass.i"
+
+		include	"init.a"
+		include	"object.a"
+		include	"owned.a"
+		include	"owner.a"
+		include	"named.a"
+		include	"shared.a"
+		include	"class.a"
+		include	"aclass.a"
+		include	"nclass.a"
+
+initialise:	bsr	init
+		jmp	[next]
+	

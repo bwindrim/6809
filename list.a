@@ -1,0 +1,62 @@
+panic		macro	str
+		  begin
+loop:		    bra	loop
+		    db	?str, 0
+		  end
+		endm
+
+
+	; Remove object from list
+	; On entry:
+	;	x = list
+	;	y = object
+	;	d = link pointer offset
+
+remove:		begin
+		  pshs	x,u,cc
+
+		  seif			; disable interrupts
+
+		  cmpy	,x		; test if first in list
+		  bne	search
+
+		  ldu	d,y		; first in list
+		  stu	,x		; remove from list
+		  bra	over
+
+search:		  ldu	,x		; not first in list
+loop:		  beq	offEnd		; end of list
+
+		  cmpy	d,u		; search list for object
+		  beq	doRemove
+
+		  ldu	d,u		; step along list
+		  bra	loop
+
+doRemove:	  ldx	d,y		; remove from list
+		  stx	d,u
+over:
+		  puls	x,u,cc,pc
+
+offEnd:		  panic	"remove: ran off end of list"
+		end
+
+
+	; add object to head of list
+	; On entry:
+	;	x = list
+	;	y = object
+	;	d = link pointer offset
+
+prepend:	begin
+		  pshs	u,cc
+
+		  seif			; disable interrupts
+
+		  ldu	,x		; current head of list
+		  stu	d,y		; chain from new object
+		  sty	,x
+
+		  puls	u,cc,pc		; return & restore
+		end
+

@@ -1,0 +1,242 @@
+resetvec	equ	$FFFE
+nmivec		equ	$FFFC
+swivec		equ	$FFFA
+irqvec		equ	$FFF8
+firqvec		equ	$FFF6
+swi2vec		equ	$FFF4
+swi3vec		equ	$FFF2
+unknown		equ	$FFF0
+ca2vec		equ	$FFEE
+ca1vec		equ	$FFEC
+srvec		equ	$FFEA
+cb2vec		equ	$FFE8
+cb1vec		equ	$FFE6
+t2vec		equ	$FFE4
+t1vec		equ	$FFE2
+viabadvec	equ	$FFE0
+
+portb		equ	$FE00	; 6522 register offsets
+porta		equ	$FE01
+ddrb		equ	$FE02
+ddra		equ	$FE03
+t1ll		equ	$FE04
+t1ch		equ	$FE05
+acr		equ	$FE0B
+pcr		equ	$FE0C
+ifr		equ	$FE0D
+ier		equ	$FE0E
+portaAlt	equ	$FE0F
+
+enporta		equ	@10000010
+disporta	equ	@00000010
+
+enportb		equ	@10010000
+disportb	equ	@00010000
+
+
+
+timeconst	equ	20000
+
+		org	$E000
+
+
+		lds	#$FE00	; set up system stack
+
+main:		begin
+		jsr	startup
+
+		bsr	intinit
+
+loop:		jsr	getchar		; get next byte from port
+		cmpa	#'A'		; test for 'A'
+		sbne	over
+;		lda	#'B'
+		bsr	startup
+		bra	loop
+over:		jsr	putchar
+		bra	loop
+		end
+
+outbyte:	begin
+		pshs	b,cc
+		seif
+		sta	portb
+loop:		ldb	ifr
+		andb	#$10
+		beq	loop
+		puls	b,cc,pc
+		end
+
+		begin
+message:	db	'H'
+		db	'e'
+		db	'l'
+		db	'l'
+		db	'o'
+		db	13
+		db	10
+		db	0
+ntry
+		ldx	#message
+loop:		lda	,x+
+		sbeq	out
+		jsr	putchar
+		bra	loop
+out:		rts
+		end
+
+
+		begin
+message:	db	'B'
+		db	'a'
+		db	'd'
+		db	'!'
+		db	13
+		db	10
+		db	0
+
+badint		entry
+		ldx	#message
+loop:		lda	,x+
+		sbeq	out
+		jsr	putchar
+		bra	loop
+out:		rti
+		end
+
+intdespatch:	begin
+		ldx	#unknown
+		lda	ifr
+		sbpl	out
+ca
+		bne	initloop
+
+;		swi
+
+		ldd	#intdespatch
+		std	irqvec
+		ldd	#inthndl
+		std	t1vec
+		ldd	#portaint
+		std	ca1vec
+		ldd	#portbint
+		std	cb1vec
+		lda	#@01000001
+		sta	acr
+		ldd	#timeconst
+		exg	a,b
+		std	t1ll
+		lda	#@11000000
+		sta	ier
+		ldb	#enporta
+		stb	ier
+		ldb	#enportb
+		stb	ier
+;		swi2
+		clif
+;		swi3
+		rts
+		end
+
+
+		begin
+	'r'
+		db	's'
+		db	't'
+		ds	128-5
+
+putchar		entry
+		begin
+		pshs	b,x,cc
+		ldx	#buffer
+		bsr	sputchar
+		puls	b,x,cc,pc
+		end
+
+portbint	entry
+		begin
+		ldx	#buffer
+		bsr	sgetcharnw
+		tstb
+		sbne	notempty
+
+		inc	waiting
+		lda	#disportb
+		sta	ier
+		rti
+
+notempty:	sta	portb
+		rti
+		end
+
+		end
+
+		begin
+
+
+portaint	entry
+		begin
+		lda	portaAlt
+		ldx	#buffer
+		bsr	sputcharnw
+		tstb
+		sbne	notfull
+
+		inc	pending
+		lda	#disporta
+		sta	ier
+		rti
+
+notfull:	lda	porta
+et
+		puls	y,cc,pc
+		end
+
+sgetchar	entry
+		begin
+		pshs	y,cc
+		ldb	readptr,x
+loop:		cmpb	writeptr,x
+		beq	loop
+		end
+
+get:		begin
+		leay	buffer,x
+		seif
+		lda	b,y
+		incb
+		stb	readptr,x
+		ldb	pending,x
+		sbeq	nopending
+
+		clr	pending,x
+		ldb	#enporta
+		stb	ier
+nopending:	ldb	#-1
+		puls	y,cc,pc
+		end
+
+sputcharnw	entry
+		begin
+		pshs	y,cc
+fullwait:	ldb	writeptr,x	; test for only one space left (full)
+ullwait
+		end
+
+		begin
+		leay	buffer,x
+		seif
+		ldb	writeptr,x
+		sta	b,y
+		incb
+		stb	writeptr,x
+		ldb	waiting,x
+		sbeq	nowaiting
+
+		clr	waiting,x
+		ldb	#enportb
+		stb	ier
+nowaiting:	puls	y,cc,pc
+		end
+
+		end

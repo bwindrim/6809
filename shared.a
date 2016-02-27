@@ -1,0 +1,114 @@
+; SHARED.A - implementation module for class SharedObject
+
+		include	"shared.i"
+		include "nclass.i"
+		include	"ref.i"
+
+
+		startup		init
+		rel
+next:		dw	0
+
+		begin
+NamedClass:	  db	"NamedClass", 0
+NamedObject:	  db	"NamedObject", 0
+SharedObject	  db	"SharedObject", 0
+Reference_str	  db	"Reference", 0
+
+Reference	  dw	0
+
+
+destroy:	begin				; destructor
+		  pshs	d,x,y,u,cc
+		  seif				; disable interrupts
+
+		  ldx	SharedObject.ref_list,x	; get first ref. in list
+loop:		  beq	panic
+
+		  cmpy	OwnedObject.owner,x
+		  beq	remove
+
+		  ldx	Reference.next_ref,x
+		  bra	loop
+
+remove:		  destroy			; destroy reference
+
+		  puls	d,x,y,u,cc,pc
+
+panic:		  bra	panic			; loop stop
+		  db	"reference list empty", 0
+		end
+
+
+ref_destroy:	begin
+		  pshs	x,y
+
+		  tfr	x,y
+		  ldx	object.class,x
+		  jsr	[class.destruct,x]
+
+steal owner ptr from Owned class
+		  pshs	d		; and pass NULL up the line
+		  ldd	#0		; (this is horrible !!)
+		  std	,u
+		  ldx	[AbstractClass.superclass,x]	; get superclass
+		  construct			; call superclass constructor
+
+
+		  std	SharedObject.ref_list	; init (D still zero)
+						; before making first ref
+		  ; ref_to (new SharedObject) and owner are on the stack
+
+		  ldx	Reference,pcr
+		  new				; make reference
+
+		  leax	destroy,pcr
+		  stx	Object.destroy,y
+
+		  leax	ref_destroy,pcr
+		  stx	SharedObject.ref_destroy,y
+
+		  puls	d,x,u,cc,pc
+		end
+
+
+destruct:	begin
+		  pshs	x
+
+		  ldx	[AbstractClass.superclass,x]	; get superclass
+		  destruct			; call superclass destructor
+
+		  puls	x,pc
+		end
+
+
+init:		entry
+		begin
+		  pshs	x,y,u
+
+		  ldx	MetaClass
+		  leay	Reference_str,pcr
+		  find_by_name
+		  sty	Reference,pcr	; initialise class variable
+
+		  leay	OwnedObject,pcr
+		  find_by_name
+		  pshs	y		; push parent class (Object)
+		  leau	OwnerObject,pcr
+		  pshs	u		; push class name
+		  pshs	x		; push object owner (MetaClass)
+		  leay	NamedClass,pcr
+		  find_by_name		; get AbstractClass into Y
+		  tfr	y,x		; select AbstractClass object
+
+		  new			; make new AbstractClass
+
+		  leau	construct, pcr
+		  stu	AbstractClass.construct,y
+		  leau	destruct, pcr
+		  stu	AbstractClass.destruct,y
+
+		  jsr	[next,pcr]		; initialise next module
+		  puls	x,y,u,pc
+		end
+	

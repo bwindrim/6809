@@ -1,0 +1,207 @@
+		org	$E000
+
+		lds	#$FDFF	; set up system stack
+		bra	main
+
+		include	"init.i"
+		include	"via6522.i"
+		include	"acia6551.i"
+		include	"despatch.i"
+		include	"stream.i"
+;		include	"tick.i"
+		include	"porta.i"
+		include	"portb.i"
+		include	"poll.i"
+		include	"toolbox.i"
+
+stdin:		dw	portastream
+stdout:		dw	portbstream
+stderr:		dw	portbstream
+
+		begin
+intinit:	  ldd	#badint
+		  ldx	#resetvec
+		  lda	#16
+
+initloop:	  std	,--x
+		  deca
+		  bne	initloop
+
+		  bra	init
+
+init		  redef	intinit
+		end
+
+
+main:		begin
+;		  jsr	startup
+
+		  bsr	init
+
+		  bsr	portstat
+		  begin
+loop3:		    bsr		getchar_nw	; get next byte from port
+		    tstb
+		    sbeq	over1
+
+		    cmpa	#1
+		    sbne	over3
+
+		    lda		#dtr | rx_int_disable | tx_disable_nrts
+		    sta		acia_command
+		    sbra	over1
+		    
+over3:		    cmpa	#2
+		    sbne	over4
+
+		    lda		#dtr | rx_int_disable | tx_disable_rts
+		    sta		acia_command
+		    sbra	over1
+
+		    
+over4:		    bsr		put_serial
+
+over1:		    bsr		get_serial_nw
+		    tstb
+		    sbeq	notfull
+
+;		    cmpa	#13		; test for CR
+;		    sbne	not_ret
+
+;		    bsr		putchar		; if so then expand to CR-LF
+;		    lda		#10
+not_ret:	    bsr		putcharnw
+		    tstb
+		    bne		notfull
+
+		    bsr		full_err
+		    bra		nostart
+
+notfull:	    ldx		stdout
+		    bsr		space		; get space in buffer (X)
+		    cmpb	#20
+		    sbhs 	nostop
+
+		    lda		#dtr | rx_int_disable | tx_disable_nrts
+		    sta		acia_command
+		    bra		nostart
+
+nostop:		    cmpb	#200
+		    sbls	nostart
+
+		    lda		#dtr | rx_int_disable | tx_disable_rts
+		    sta		acia_command
+
+nostart:
+over2:		    bra		loop3
+		  end
+		end
+
+outbyte:	begin
+		  pshs	b,cc
+		  seif
+		  sta	portb
+loop:		  ldb	ifr
+		  andb	#$10
+		  beq	loop
+		  puls	b,cc,pc
+		end
+
+outstring:	begin
+		  pshs  a,cc
+		  seif
+
+loop:		  lda	,x+
+		  sbeq	out
+		  jsr	outbyte
+		  bra	loop
+
+out:		  puls  a,cc,pc
+		end
+
+		begin
+message:	  db	"Hello", 13, 10, 0
+
+startup		entry
+		  ldx	#message
+		  bsr	outstring
+		end
+
+		begin
+message:	  db	"Tick7", 13, 10, 0
+
+tick		entry
+		  ldy	#message
+		  lda	#7
+		  bsr	putblk
+		  rts
+		end
+
+		begin
+message:	  db	"Buffer Overflow", 13, 10, 0
+
+full_err	entry
+		  ldy	#message
+		  lda	#17
+		  bsr	putblk
+		  rts
+		end
+
+		begin
+message:	  db	"Bad!", 10, 13, 0
+
+badint		entry
+		  ldx	#message
+loop:		  lda	,x+
+		  sbeq	out
+		  jsr	putchar
+		  bra	loop
+
+out:		  rti
+		end
+
+getchar:	begin
+		  pshs		b,x,cc
+		  ldx		stdin
+		  getchar
+		  puls		b,x,cc,pc
+		end
+
+		b,x,cc
+		  ldx		stdout
+		  putcharnw
+		  puls		b,x,cc,pc
+		end
+
+putblk:		begin
+		  pshs		a,b,x,y,cc
+		  ldx		stdout
+		  putblk
+		  puls		a,b,x,y,cc,pc
+		end
+
+puthex:		begin
+		  pshs		x
+		  ldx		stdout
+		  bsr		hex_byte
+		  puls		x,pc
+		end
+
+portstat:	begin
+		  pshs		a
+		  lda		acia_status
+		  bsr		puthex
+		  lda		#0
+		  sta		acia_command
+		  lda		acia_status
+		  bsr		puthex
+		  lda		#dtr | rx_int_disable | tx_disable_nrts
+		  sta		acia_command
+		  lda		acia_status
+		  bsr		puthex
+		  lda		#dtr | rx_int_disable | tx_disable_rts
+		  sta		acia_command
+		  lda		acia_status
+		  bsr		puthex
+		  puls		a,pc
+		end

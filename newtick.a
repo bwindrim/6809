@@ -1,0 +1,226 @@
+		org	$E000
+
+		lds	#$FDFF	; set up system stack
+		jmp	main
+
+		include	"init.i"
+		include	"via6522.i"
+		include	"acia6551.i"
+		include	"despatch.i"
+		include	"stream.i"
+		include	"tick.i"
+		include	"porta.i"
+		include	"portb.i"
+		include	"poll.i"
+		include	"toolbox.i"
+		include	"dump.i"
+
+stdin:		dw	portastream
+stdout:		dw	portbstream
+stderr:		dw	portbstream
+
+		begin
+intinit:	  ldd	#badint
+		  ldx	#resetvec
+		  lda	#16
+
+initloop:	  std	,--x
+		  deca
+		  bne	initloop
+
+		  jmp	init
+
+init		  redef	intinit
+		end
+
+
+main:		begin
+		  jsr	startup
+
+		  jsr	init
+		  jsr	startup
+
+		  jsr	portstat
+		  jsr	startup
+		  begin
+loop3:		    jsr		getchar_nw	; get next byte from port
+		    tstb
+		    sbeq	over1
+
+		    cmpa	#1
+		    sbne	over3
+
+		    lda		#dtr | rx_int_disable | tx_disable_nrts
+		    sta		acia_command
+		    sbra	over1
+		    
+over3:		    cmpa	#2
+		    sbne	over4
+
+		    lda		#dtr | rx_int_disable | tx_disable_rts
+		    sta		acia_command
+		    sbra	over1
+
+		    
+over4:		    jsr		put_serial
+
+over1:		    jsr		get_serial_nw
+		    tstb
+		    sbeq	over2
+
+;		    cmpa	#13		; test for CR
+;		    sbne	not_ret
+
+;		    jsr		putchar		; if so then expand to CR-LF
+;		    lda		#10
+not_ret:	    jsr		putchar
+
+over2:		    jmp		loop3
+		  end
+
+loop2:		  jsr	getchar		; get next byte from port
+		  jsr	put_serial
+		  jmp	loop2
+
+loop1:		  jsr	get_serial
+		  cmpa	#13		; test for CR
+		  sbne	not_ret
+
+		  jsr	putchar		; if so then expand to CR-LF
+		  lda	#10
+not_ret:	  jsr	putchar
+		  jmp	loop1
+
+loop:		  jsr	getchar		; get next byte from port
+		  cmpa	#'A'		; test for 'A'
+		  sbne	over
+		  lda	#'x'
+over:		  jsr	put_serial
+		  jsr	get_serial
+		  jsr	putchar
+		  jmp	loop
+		end
+
+outbyte:	begin
+		  pshs	b,cc
+		  seif
+		  sta	portb
+loop:		  ldb	ifr
+		  andb	#$10
+		  beq	loop
+		  puls	b,cc,pc
+		end
+
+outstring:	begin
+loop:		  lda	,x+
+		  sbeq	out
+		  jsr	outbyte
+		  jmp	loop
+out:		  rts
+		end
+
+putstring:	begin
+		  pshs	a,x,y,b
+		  clra
+		  tfr	x,y
+loop:		  ldb	,x+
+		  sbeq	out
+		  inca
+		  jmp	loop
+
+out:		  jsr	putblk
+
+		  puls	a,x,y,b,pc
+		end
+
+		begin
+message:	  db	"Hello", 13, 10, 0
+
+startup		entry
+		  ldx	#message
+		  jsr	outstring
+		end
+
+		begin
+message:	  db	"Tick7", 13, 10, 0
+
+tick		entry
+		  ldy	#message
+		  lda	#7
+		  jsr	putblk
+		  rts
+		end
+
+		begin
+message:	  db	"Bad!", 10, 13, 0
+
+badint		entry
+		  ldx	#message
+loop:		  lda	,x+
+		  sbeq	out
+		  jsr	putchar
+		  jmp	loop
+
+out:		  rti
+		end
+
+getchar:	begin
+		  pshs		b,x,cc
+		  ldx		stdin
+		  getchar
+		  puls		b,x,cc,pc
+		end
+
+getchar_nw:	begin
+		  pshs		x,cc
+		  ldx		stdin
+		  getcharnw
+		  puls		x,cc,pc
+		end
+
+putchar:	begin
+		  pshs		b,x,cc
+		  ldx		stdout
+		  putchar
+		  puls		b,x,cc,pc
+		end
+
+putblk:		begin
+		  pshs		a,b,x,y,cc
+		  ldx		stdout
+		  putblk
+		  puls		a,b,x,y,cc,pc
+		end
+
+puthex:		begin
+		  pshs		x
+		  ldx		stdout
+		  jsr		hex_byte
+		  puls		x,pc
+		end
+
+puthexword:	begin
+		  pshs		x
+		  ldx		stdout
+		  bsr		hex_word
+		  puls		x,pc
+		end
+
+portstat:	begin
+		  pshs		a
+		  lda		acia_status
+		  jsr		puthex
+		  lda		#0
+		  sta		acia_command
+		  lda		acia_status
+		  jsr		puthex
+		  lda		#dtr | rx_int_disable | tx_disable_nrts
+		  sta		acia_command
+		  lda		acia_status
+		  jsr		puthex
+		  lda		#dtr | rx_int_disable | tx_disable_rts
+		  sta		acia_command
+		  lda		acia_status
+		  jsr		puthex
+		  puls		a,pc
+		end

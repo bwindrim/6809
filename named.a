@@ -1,0 +1,56 @@
+; NAMED.A - implementation module for class NamedObject
+
+;		include	"named.i"
+;		include "nclass.i"
+
+
+
+		begin
+namedobject	entry
+		AbstractClass classname, construct, destruct
+
+classname:	db	"NamedObject", 0
+
+
+	; NamedObject constructor
+	; On entry:
+	;	x = class
+	;	y = new object
+	;	u = stack argument pointer
+
+construct:	begin
+		  pshs	d,x
+
+		  ldx	[AbstractClass.superclass,x]	; get superclass
+		  construct			; call superclass constructor
+
+		  ldd	,u++			; get name from arg. list
+		  std	NamedObject.name,y	; set up in object
+
+		  puls	d,x,pc
+		end
+
+
+	; NamedObject destructor
+	; On entry:
+	;	x = class
+	;	y = object being destroyed
+
+destruct:	begin
+		  pshs	x
+
+		  ldx	[AbstractClass.superclass,x]	; get superclass
+		  destruct			; call superclass destructor
+
+		  puls	x,pc
+		end
+
+
+		begin
+objectinit:	    bra		init
+
+init		    redef	intinit
+		end
+
+		end
+	

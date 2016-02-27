@@ -1,0 +1,33 @@
+resetvec	equ	$FFFE
+nmivec		equ	$FFFC
+swivec		equ	$FFFA
+irqvec		equ	$FFF8
+firqvec		equ	$FFF6
+swi2vec		equ	$FFF4
+swi3vec		equ	$FFF2
+unknown		equ	$FFF0
+ca2vec		equ	$FFFE
+ca1vec		equ	$FFFC
+srvec		equ	$FFFA
+cb2vec		equ	$FFF8
+cb1vec		equ	$FFF6
+t2vec		equ	$FFF4
+t1vec		equ	$FFF2
+viabadvec	equ	$FFE0
+
+
+intdespatch:	begin
+		ldx	#unknown
+		lda	ifr
+		sbpl	out
+
+		anda	ier
+		ora	#80		; set last bit to ensure default vec
+
+loop:		leax	-2,x
+		asra
+		sbcc	loop
+
+out:		jmp	[,x]
+		end
+

@@ -1,0 +1,43 @@
+portb		equ	0	; 6522 register offsets
+porta		equ	1
+ddrb		equ	2
+ddra		equ	3
+ifr		equ	13
+
+		org	$E000
+
+
+		lds	#$f000	; set up system stack
+		jmp	main
+
+		begin
+message:	db	'H'
+		db	'e'
+		db	'l'
+		db	'l'
+		db	'o'
+		db	13
+		db	10
+		db	0
+
+startup		entry
+		ldx	#message
+loop:		lda	,x+
+		sbeq	out
+		jsr	outbyte
+		bra	loop
+out:		rts
+		end
+
+main:		begin
+		jsr	startup
+loop:		jsr	getbyte		; get next byte from port
+		cmpa	#'A'		; test for 'A'
+		sbne	over
+;		lda	#'B'
+		bsr	startup
+		bra	loop
+over:		jsr	outbyte
+		bra	loop
+		end
+

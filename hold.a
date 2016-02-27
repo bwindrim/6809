@@ -1,0 +1,266 @@
+resetvec	equ	$FFFE	; hardware interrupt vectors
+nmivec		equ	$FFFC
+swivec		equ	$FFFA
+irqvec		equ	$FFF8
+firqvec		equ	$FFF6
+swi2vec		equ	$FFF4
+swi3vec		equ	$FFF2
+unknown		equ	$FFF0	; despatcher interrupt vectors
+ca2vec		equ	$FFEE
+ca1vec		equ	$FFEC
+srvec		equ	$FFEA
+cb2vec		equ	$FFE8
+cb1vec		equ	$FFE6
+t2vec		equ	$FFE4
+t1vec		equ	$FFE2
+viabadvec	equ	$FFE0
+
+portb		equ	$FE00	; 6522 register offsets
+porta		equ	$FE01
+ddrb		equ	$FE02
+ddra		equ	$FE03
+t1cl		equ	$FE04
+t1ch		equ	$FE05
+t1ll		equ	$FE06
+t1lh		equ	$FE07
+t2cl		equ	$FE08
+t2ch		equ	$FE09
+sr		equ	$FE0A
+acr		equ	$FE0B
+pcr		equ	$FE0C
+ifr		equ	$FE0D
+0010000
+t2flag		equ	@00100000
+t1flag		equ	@01000000
+
+
+
+timeconst	equ	20000
+
+		org	$E000
+
+
+		lds	#$FDFF	; set up system stack
+
+main:		begin
+		jsr	startup
+
+		bsr	intinit
+a	portb
+loop:		ldb	ifr
+		andb	#$10
+		beq	loop
+		puls	b,cc,pc
+		end
+
+		begin
+message:	db	'H'
+		db	'e'
+		db	'l'
+		db	'l'
+		db	'o'
+		db	13
+		db	10
+		db	0
+
+startup		entry
+		ldx	#message
+loop:		lda	,x+
+		sbeq	out
+		jsr	outbyte
+		bra	loop
+out:		rts
+		end
+
+		begin
+message:	db	'T'
+		db	'i'
+		db	'c'
+		db	'k'
+		db	13
+		db	10
+		db	0
+
+tick		entry
+		ldx	#message
+loop:		lda	,x+
+		sbeq	out
+		jsr	putchar
+		bra	loop
+out:		rts
+		end
+
+
+		begin
+in
+		ldx	#unknown
+dx	#resetvec
+		lda	#16
+
+initloop:	std	,--x
+		deca
+		bne	initloop
+
+		ldd	#intdespatch
+		std	irqvec
+		ldd	#inthndl
+		std	t1vec
+		ldd	#portaint
+		std	ca1vec
+		ldd	#portbint
+		std	cb1vec
+		lda	#@01000001
+		sta	acr
+		ldd	#timeconst
+		exg	a,b
+		std	t1cl
+		lda	#enable | t1flag | ca1flag | cb1flag	; @11000000
+		sta	ier
+		clif
+		rts
+		end
+
+
+		begin
+count:		db	100
+inthndl		entry
+		lda	t1cl	; clear source of interrupt
+		dec	count
+		sbne	out
+		lda	#100
+		sta	count
+		clif
+		bsr	tick
+out:		rti
+		end
+
+		begin
+wakeup		equ	0
+buffer:		dw	0
+		db	0
+		db	6
+		ds	128
+,x
+		clr	wakeup+1,x
+		ldb	#enable | ca1flag	; enporta
+		stb	ier
+		rts
+		end
+
+portaint	entry
+		begin
+		lda	portaAlt
+		ldx	#buffer
+		bsr	sputcharnw
+		tstb
+		sbne	notfull
+
+		ldd	#portawake
+		std	wakeup,x
+		lda	#disable | ca1flag	; disporta
+		sta	ier
+		rti
+
+notfull:	lda	porta
+		rti
+		end
+
+		end
+
+		begin
+wakeup		equ	0
+buffer:		dw	0
+
+portbwake:	begin
+		clr	wakeup,x
+		clr	wakeup+1,x
+		ldb	#enable | cb1flag	; enportb
+		stb	ier
+		rts
+		end
+
+portbint	entry
+		begin
+		ldx	#buffer
+		bsr	sgetcharnw
+		tstb
+		sbne	notempty
+
+		ldd	#portbwake
+		std	wakeup,x
+		lda	#disable | cb1flag	; disportb
+		sta	ier
+		rti
+
+notempty:	sta	portb
+		rti
+		end
+
+		end
+
+		begin
+wakeup		equ	0
+readptr		equ	2
+writeptr	equ	3
+b	readptr,x
+loop:	;	clif
+;		seif
+		cmpb	writeptr,x
+		beq	loop
+		end
+
+get:		begin
+		leay	buffer,x
+		seif
+		lda	b,y
+		incb
+		stb	readptr,x
+		ldy	wakeup,x
+		sbeq	nopending
+
+		jsr	,y
+
+nopending:	ldb	#-1
+		puls	y,cc,pc
+		end
+
+sputcharnw	entry
+		begin
+		pshs	y,cc
+;		seif
+		ldb	writeptr,x	; test for only one space left (full)
+		subb	readptr,x
+		incb
+		sbne	put
+
+		puls	y,cc,pc
+		end
+
+sputchar	entry
+		begin
+		pshs	y,cc
+fullwait:	;clif
+;		seif
+		ldb	writeptr,x	; test for only one space left (full)
+		subb	readptr,x
+		incb
+		beq	fullwait
+		end
+
+put:		begin
+		leay	buffer,x
+		seif
+		ldb	writeptr,x
+		sta	b,y
+		incb
+		stb	writeptr,x
+		ldy	wakeup,x
+		sbeq	nowaiting
+
+		jsr	,y
+
+nowaiting:	ldb	#-1
+		puls	y,cc,pc
+		end
+
+		end

@@ -1,0 +1,208 @@
+		org	$E000
+
+		lds	#$FDFF	; set up system stack
+		bra	main
+
+		include	"init.i"
+		include	"via6522.i"
+		include	"acia6551.i"
+		include	"despatch.i"
+		include	"stream.i"
+;		include	"tick.i"
+		include	"porta.i"
+		include	"portb.i"
+		include	"poll.i"
+		include	"toolbox.i"
+
+stdin:		dw	portastream
+stdout:		dw	portbstream
+stderr:		dw	portbstream
+
+good:		db	0
+
+		begin
+intinit:	  ldd	#badint
+		  ldx	#resetvec
+		  lda	#16
+
+initloop:	  std	,--x
+		  deca
+		  bne	initloop
+
+		  bra	init
+
+init		  redef	intinit
+		end
+
+
+main:		begin
+;		  jsr	startup
+
+		  bsr	init
+
+test:		  ldd	#$abcd
+		  bsr   puthexword
+;		  bsr   getchar
+
+start:		  ldx   #0000
+		  bsr   newline
+
+loop:		  lda   ,x
+		  tfr   a,b
+		  comb
+		  stb   ,x
+		  cmpb  ,x
+		  bne   notram
+
+isram:		  sta   ,x
+		  lda   good
+		  bne   over
+
+		  inca
+		  sta   good
+		  tfr	x,d
+		  bsr   puthexword
+		  bsr   dash
+		  bra   over
+
+notram:		  lda   good
+		  beq   over
+
+		  clra
+		  sta   good
+		  tfr   x,d
+		  subd  #1
+		  bsr   puthexword
+		  bsr   newline
+
+over:		  leax  256,x
+		  cmpx  #$fe00
+		  bne   loop
+
+		  tfr   x,d
+		  subd  #1
+		  bsr   puthexword
+		  bsr   newline
+		  bsr   newline
+end:		  bsr   finished
+
+stop:		  bra   stop
+		
+		end
+
+outbyte:	begin
+		  pshs	b,cc
+		  seif
+		  sta	portb
+loop:		  ldb	ifr
+		  andb	#$10
+		  beq	loop
+		  puls	b,cc,pc
+		end
+
+outstring:	begin
+loop:		  lda	,x+
+		  sbeq	out
+		  jsr	outbyte
+		  bra	loop
+out:		  rts
+		end
+
+		begin
+message:	  db	"Hello", 13, 10, 0
+
+startup		entry
+		  ldx	#message
+		  bsr	outstring
+		end
+
+		begin
+message:	  db	" - ", 0
+
+dash		entry
+		  ldy	#message
+		  lda	#3
+		  bsr	putblk
+		  rts
+		end
+
+		begin
+message:	  db	"Finished", 10, 13, 0
+
+finished	entry
+		  ldy	#message
+		  lda	#10
+		  bsr	putblk
+		  rts
+		end
+
+newline:	begin
+		  lda   #10
+		  bsr   putchar
+		  lda   #13
+		  bsr   putchar
+		  rts
+		end
+
+		begin
+message:	  db	"Bad!", 10, 13, 0
+
+badint		entry
+		  ldx	#message
+loop:		  lda	,x+
+		  sbeq	out
+		  jsr	putchar
+		  bra	loop
+
+out:		  rti
+		end
+
+getchar:	begin
+		  pshs		b,x,cc
+		  ldx		stdin
+		  getchar
+		  puls		b,x,cc,pc
+		end
+
+getchar_nw:	begin
+		  pshs		x,cc
+		  ldx		stdin
+		  getcharnw
+		  puls		x,cc,pc
+		end
+
+putchar:	begin
+		  pshs		b,x,cc
+		  ldx		stdout
+		  putchar
+		  puls		b,x,cc,pc
+		end
+
+putcharnw:	begin
+		  pshs		b,x,cc
+		  ldx		stdout
+		  putcharnw
+		  puls		b,x,cc,pc
+		end
+
+putblk:		begin
+		  pshs		a,b,x,y,cc
+		  ldx		stdout
+		  putblk
+		  puls		a,b,x,y,cc,pc
+		end
+
+puthex:		begin
+		  pshs		x
+		  ldx		stdout
+		  bsr		hex_byte
+		  puls		x,pc
+		end
+
+puthexword:	begin
+		  pshs		x
+		  ldx		stdout
+		  bsr		hex_word
+		  puls		x,pc
+		end
+	

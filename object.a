@@ -1,0 +1,144 @@
+; OBJECT.A - implementation module for class Object
+
+;		include	"object.i"
+;		include "aclass.i"
+
+
+		begin
+
+object		entry
+		AbstractClass	classname, construct, destruct
+
+classname:	db	"Object", 0
+
+
+	; Object destroy method
+	; On entry:
+	;	x = object to be destroyed
+	;	y = owner of object
+	
+destroy:	begin
+		  pshs	x,u
+		  pshs	y		; push owner as argument onto stack
+		  tfr	s,u		; u is argument pointer
+		  tfr	x,y		; y is now object to be destroyed
+		  ldx	Object.class,x	; x is object's class
+		  destruct		; call class destructor
+		  puls	y
+		  puls	x,u,pc
+		end
+
+
+	; Base object constructor
+	; On entry:
+	;	x = class
+	;	y = new object
+	;	u = stack argument pointer
+
+construct:	begin
+		  pshs	d,x
+
+		  ldd	#destroy
+		  std	Object.destroy, y	; set up destroy method
+		  stx	Object.class,y		; set up class pointer
+
+		  leax	ConcreteClass.list,x	; add to class inst. list
+		  ldd	#Object.next_in_class
+		  bsr	List.prepend
+
+		  puls	d,x,pc
+		end
+
+
+	; Base object destructor
+	; On entry:
+	;	x = class
+	;	y = object being destroyed
+
+destruct:	begin
+		  pshs	d,x
+
+		  ; remove object from class list
+		  leax	ConcreteClass.list,x
+		  ldd	#Object.next_in_class
+		  bsr	List.remove
+
+		  puls	d,x,pc
+		end
+
+
+		begin
+objectinit:	    bra		init
+
+init		    redef	intinit
+		end
+
+		end
+
+
+	; Base object constructor
+	; On entry:
+	;	x = class
+	;	y = new object
+	;	u = stack argument pointer
+
+construct:	begin
+		  pshs	d,cc
+
+		  ldd	#destroy
+		  std	Object.destroy, y	; set up destroy method
+		  stx	Object.class,y		; set up class pointer
+
+		  seif				; disable interrupts
+		  ldd	ConcreteClass.list,x	; add to class inst. list
+		  std	Object.next_in_class,y
+		  sty	ConcreteClass.list,x
+
+		  puls	d,cc,pc
+		end
+
+
+	; Base object destructor
+	; On entry:
+	;	x = class
+	;	y = object being destroyed
+
+destruct:	begin
+		  pshs	d,u,cc
+
+		  ; remove object from class list
+		  seif				; disable interrupts
+
+		  cmpy	ConcreteClass.list,x	; test if first in class list
+		  bne	search
+
+		  ldd	Object.next_in_class,y	; first in list
+		  std	ConcreteClass.list,x	; remove from class list
+		  bra	over
+
+search:		  ldu	ConcreteClass.list,x	; not first in list
+loop:		  beq	panic			; end of list
+
+		  cmpy	Object.next_in_class,u	; search class list for object
+		  beq	remove
+
+		  ldu	Object.next_in_class,u	; step along list
+		  bra	loop
+
+remove:		  ldd	Object.next_in_class,y	; remove from list
+		  std	Object.next_in_class,u
+over:
+		  puls	d,u,cc,pc
+
+panic:		  bra	panic			; loop stop
+		  db	"Ran off end of class list", 0
+		end
+
+
+		begin
+objectinit:	    bra		init
+
+init		    redef	intinit
+		end
+
+		end

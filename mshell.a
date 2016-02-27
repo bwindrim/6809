@@ -1,0 +1,406 @@
+		org	$E000
+
+		lds	#$FDFF	; set up system stack
+		bra	main
+
+		include	"init.i"
+		include	"via6522.i"
+;		include	"acia6551.i"
+		include	"despatch.i"
+		include	"stream.i"
+;		include	"tick.i"
+		include	"porta.i"
+		include	"portb.i"
+;		include	"poll.i"
+		include	"toolbox.i"
+;		include	"dump.i"
+
+stdin:		dw	portastream
+stdout:		dw	portbstream
+stderr:		dw	portbstream
+
+buffsize	equ	127
+
+lbuff:		ds	buffsize
+
+cmdtab:		db	"version", 0
+		dw	startup
+		db	"echo", 0
+		dw	echo
+		db	"dump", 0
+		dw	dump
+		db	0
+
+mempos:		dw	0
+
+
+		begin
+intinit:	  ldd	#badint
+		  ldx	#resetvec
+		  lda	#16
+
+initloop:	  std	,--x
+		  deca
+		  bne	initloop
+
+		  bra	init
+
+init		  redef	intinit
+		end
+
+
+main:		begin
+		  bsr	init
+		  bsr	startup
+
+		  begin
+mainloop:	    bsr	  prompt
+		    bsr   getline
+;		    ldx	  #lbuff
+;		    bsr	  putstring
+		    bsr   doline
+		    bra   mainloop
+		  end
+		end
+
+oldstring:	begin
+loop:		  lda	,x+
+		  sbeq	out
+;		  bsr	outbyte
+		  bra	loop
+out:		  rts
+		end
+
+putstring:
+outstring:	begin
+		  pshs	a,x,y,b
+		  clra
+		  tfr	x,y
+loop:		  ldb	,x+
+		  sbeq	out
+		  inca
+		  bra	loop
+
+out:		  bsr	putblk
+
+		  puls	a,x,y,b,pc
+		end
+
+		begin
+message:	  db	"MicroShell V0.1", 13, 10, 0
+
+startup		entry
+		  pshs	x
+		  ldx	#message
+		  bsr	outstring
+		  puls	x,pc
+		end
+
+		begin
+message:	  db	"> ", 0
+
+prompt		entry
+		  pshs	x,d
+		  ldd	mempos
+		  bsr	puthexword
+		  ldx	#message
+		  bsr	outstring
+		  puls	x,d,pc
+ pshs		b,x,y,cc
+		  ldx		stdin
+		  getchar
+		  puls		b,x,y,cc,pc
+		end
+
+getchar_nw:	begin
+		  pshs		x,cc
+		  ldx		stdin
+		  getcharnw
+		  puls		x,cc,pc
+		end
+
+putchar:	begin
+		  pshs		b,x,y,cc
+		  ldx		stdout
+		  putchar
+		  puls		b,x,y,cc,pc
+		end
+
+putblk:		begin
+		  pshs		a,b,x,y,cc
+		  ldx		stdout
+		  putblk
+		  puls		a,b,x,y,cc,pc
+		end
+
+puthex:		begin
+		  pshs		x
+		  ldx		stdout
+		  bsr		hex_byte
+		  puls		x,pc
+		end
+
+puthexword:	begin
+		  pshs		x
+		  ldx		stdout
+		  bsr		hex_word
+		  puls		x,pc
+		end
+
+echo:		begin
+		  pshs	x
+		  leax	,y
+		  bsr	putstring
+		  puls	x, pc
+		end
+
+	  puls	y,a,pc
+		end
+
+doline:		begin
+		  pshs	x,y
+		  ldx	#cmdtab
+oloop:		  lda	,x
+		  beq	exit
+
+		  ldy	#lbuff
+loop:		  lda	,x+
+		  beq	matched
+
+		  cmpa	,y+
+		  beq	loop
+
+:		  ldx	#lbuff
+		  bsr	putstring
+		  lda	#'?'
+		  bsr	putchar
+		  bsr	newline
+		  puls	x,y,pc
+		end
+
+putcharmaybe:	begin
+		  cmpa	#32
+		  blo	dot
+		  cmpa	#128
+		  bhs	dot
+out:		  bsr	putchar
+		  rts
+
+dot:		  lda	#'.'
+		  bra	out
+		end
+
+newline:	begin
+		  pshs	a
+		  lda	#13
+		  bsr	putchar
+		  lda	#10
+		  bsr	putchar
+		  puls	a,pc
+		end
+
+putspace:	begin
+		  pshs	a
+		  lda	#' '
+		  bsr putchar
+		  puls	a,pc
+		end
+
+dump:		begin
+		  pshs	x
+
+		  ldx	mempos
+		  tfr	x,y
+		  lda	#16
+
+oloop:		  sta	,-s
+		  tfr	x,d
+		  bsr	puthexword
+		  bsr	putspace
+
+		  ldb	#16
+iloop1:		  lda	,x+
+		  bsr	puthex
+		  bsr	putspace
+		  decb
+		  bne	iloop1
+
+		  ldb	#16
+iloop2:		  lda	,y+
+		  bsr	putcharmaybe
+		  decb
+		  bne	iloop2
+
+		  bsr	newline
+
+		  lda	,s+
+		  deca
+		  bne	oloop
+
+		  stx	mempos
+		  puls	x,pc
+		end
+
+		begin
+brtab:		  db	"bra", 0
+ 0
+		  db	"ble", 0
+bsr_str:	  db	"bsr", 0
+
+dissasm		entry
+		  pshs	x,y
+		  ldy	mempos
+		  tfr	y,d
+		  bsr	puthexword
+		  bsr	space
+		  ldb	,y
+		  bne	type1
+
+		  andb	#$70
+		  beq	type2
+
+		  cmpb	#$40
+		  bhs	type2
+	page1
+		  dw	page2
+		  dw	nop
+		  dw	sync
+		  dw	bad
+		  dw	bad
+		  dw	lbra
+		  dw	lbsr
+		  dw	bad
+		  dw	daa
+		  dw	orcc
+		  dw	bad
+		  dw	andcc
+		  dw	sex
+		  dw	exg
+		  dw	tfr
+
+tab_3:		  dw	leax
+		  dw	leay
+		  dw	leas
+		  dw	leau
+		  dw	pshs
+		  dw	puls
+		  dw	pshu
+		  dw	pulu
+		  dw	bad
+		  dw	rts
+		  dw	abx
+		  dw	rti
+		  dw	cwai
+		  dw	mul
+		  dw	bad
+		  dw	swi
+
+type2:		  ldb	,y
+		  cpmb	#$4e
+		  beq	bad
+		  cmpb	#$5e
+		  beq	bad
+
+		  ldx	tab_type2
+		  andb	#$0f
+		  lslb
+		  lslb
+		  lda	b,x
+		  beq	bad
+		  leax	b,x
+		  bsr	putstring
+		  ldb	,y
+		  and	#$f0
+		  cmpb	#0
+		  beq	direct
+		  cmpb	#$40
+		  beq	rega
+		  cmpb	#$50
+		  beq	regb
+		  cmpb	#$60
+		  beq	indexed
+		  cmpb	#$70
+		  beq	extended
+
+tab_type2:	  db	"neg",0
+		  db	0,0,0,0
+		  db	0,0,0,0
+		  db	"com",0
+		  db	"lsr",0
+		  db	0,0,0,0
+		  db	"ror",0
+		  db	"asr",0
+		  db	"lsl",0
+		  db	"rol",0
+		  db	"dec",0
+		  db	0,0,0,0
+		  db	"inc",0
+		  db	"tst",0
+		  db	"jmp",0
+		  db	"clr",0
+
+tab_type1:	  db	"suba",0
+		  db	"subb",0
+		  db	"cmpa",0
+		  db	"cmpb",0
+		  db	"sbca",0
+		  db	"sbcb",0
+		  db	"subd",0
+,0,0
+		  db	"orb",0,0
+		  db	"adda",0
+		  db	"addb",0
+		  db	"cmpx",0
+		  db	"ldd",0,0
+		  db	"jsr",0,0
+		  db	"std",0,0
+		  db	"ldx",0,0
+		  db	"ldu",0,0
+		  db	"stx",0,0
+		  db	"stu",0,0
+
+type1:		  ldb	,y
+		  lslb
+		  bpl	nobit
+
+		  incb
+nobit:		  andb	#$1f
+		  lda	#5
+		  mul
+		  ldx	tab_type1
+		  leax	d,x
+		  bsr	putstring
+		  ldb	,y
+		  andb	#$30
+		  beq	immed
+		  cmpb	#$10
+		  beq	direct
+		  cmpb	#$20
+		  beq	indexed
+		  bra	extended
+
+direct:		  leay	1,y
+		  bsr	space
+		  lda	,y+
+		  bsr	puthex
+		  bra	exit
+
+extended:	  leax	1,y
+		  bsr	space
+		  ldd	,y++
+		  bsr	puthexword
+		  bra 	exit
+
+indexed:	  leax	1,y
+		  bsr	space
+		  ldb	,y
+		  bpl	fivebit
+
+		  cmpb	#@00100000
+		  beq	putreg
+		  lda	#'u'
+		  cmpb	#@01000000
+		  beq	putreg
+		  lda	#'s'
+putreg:		  bsr	putchar
+		  bra	exit

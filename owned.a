@@ -1,0 +1,179 @@
+; OWNED.A - implementation module for class OwnedObject
+
+;		include	"owned.i"
+;		include "aclass.i"
+
+
+
+		begin
+ownedobject	entry
+		AbstractClass	classname, construct, destruct
+
+classname:	db	"OwnedObject", 0
+
+
+	; OwnedObject destroy method
+	; On entry:
+	;	x = object to be destroyed
+	;	y = owner of object
+	
+destroy:	begin				; destructor
+		  cmpy	OwnedObject.owner,x	; validate
+		  bne	panic
+
+		  pshs	x,u
+		  pshs	y		; push owner as argument onto stack
+		  tfr	s,u		; u is argument pointer
+		  tfr	x,y		; y is now object to be destroyed
+		  ldx	Object.class,x	; x is object's class
+		  destruct		; call class destructor
+		  puls	y
+		  puls	x,u,pc
+
+panic:		  bra	panic		; loop stop
+		  db	"destruction not by owner", 0
+		end
+
+
+	; OwnedObject constructor
+	; On entry:
+	;	x = class
+	;	y = new object
+	;	u = stack argument pointer
+
+construct:	begin
+		  pshs	d,x
+
+		  ldx	[AbstractClass.superclass,x]	; get superclass
+		  construct			; call superclass constructor
+
+		  ldd	#destroy	       ; substitute new destroy method
+		  std	Object.destroy,y
+
+		  ; X being used as general reg.
+		  ldx	,u++			; set pointer to owner
+		  stx	OwnedObject.owner,y
+		  beq	exit			; if NULL then skip
+
+		  leax	OwnerObject.list,x	; add to ownership list
+		  ldd	#OwnedObject.next_owned
+		  bsr	List.prepend
+
+exit:		  puls	d,x,pc
+		end
+
+
+	; OwnedObject destructor
+	; On entry:
+	;	x = class
+	;	y = object being destroyed
+
+destruct:	begin
+		  pshs	d,u,x
+	
+		  ; remove object from owner's owned list
+		  ldu	OwnedObject.owner,y
+		  beq	over			; if NULL then skip all this
+						; as it must be shared
+
+		  pshs	x
+		  leax	OwnerObject.owned_list,u
+		  ldd	#OwnedObject.next_owned
+		  bsr	List.remove
+		  puls	x
+
+over:		  ldx	AbstractClass.superclass,x	; get superclass
+		  destruct			; call superclass destructor
+
+		  puls	d,u,x,pc
+		end
+
+		begin
+objectinit:	    bra		init
+
+init		    redef	intinit
+		end
+
+		end
+
+
+	; OwnedObject constructor
+	; On entry:
+	;	x = class
+	;	y = new object
+	;	u = stack argument pointer
+
+construct:	begin
+		  pshs	d,x,cc
+
+		  ldx	[AbstractClass.superclass,x]	; get superclass
+		  construct			; call superclass constructor
+
+		  ldd	#destroy	       ; substitute new destroy method
+		  std	Object.destroy,y
+
+		  ; X being used as general reg.
+		  ldx	,u++			; set pointer to owner
+		  stx	OwnedObject.owner,y
+		  beq	exit			; if NULL then skip
+
+		  seif				; disable interrupts
+
+		  ldd	OwnerObject.list,x	; add to ownership list
+		  std	OwnedObject.next_owned,y
+		  sty	OwnerObject.list,x
+
+exit:		  puls	d,x,cc,pc
+		end
+
+
+	; OwnedObject destructor
+	; On entry:
+	;	x = class
+	;	y = object being destroyed
+
+destruct:	begin
+		  pshs	d,u,x,cc
+		  seif				; disable interrupts
+	
+		  ; remove object from owner's owned list
+		  ldu	OwnedObject.owner,y
+		  beq	over			; if NULL then skip all this
+						; as it must be shared
+
+		  cmpy	OwnerObject.owned_list,u ; test if first in owner list
+		  bne	search
+
+		  ldd	OwnedObject.next_owned,y ; first in list
+		  std	OwnerObject.owned_list,u ; remove from class list
+		  bra	over
+
+search:		  ldu	OwnerObject.owned_list,u ; not first in list
+loop:		  beq	panic			 ; end of list
+
+		  cmpy	OwnedObject.next_owned,u ; search owner list for object
+		  beq	remove
+
+		  ldu	OwnedObject.next_owned,u ; step along list
+		  bra	loop
+
+remove:		  ldd	OwnedObject.next_owned,y	; remove from list
+		  std	OwnedObject.next_owned,u
+
+over:
+		  ldx	[AbstractClass.superclass,x]	; get superclass
+		  destruct			; call superclass destructor
+
+		  puls	d,u,x,cc,pc
+
+panic:		  bra	panic			; loop stop
+		  db	"Ran off end of owned list", 0
+		end
+
+		begin
+objectinit:	    bra		init
+
+init		    redef	intinit
+		end
+
+		end
