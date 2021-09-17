@@ -7,7 +7,7 @@ intinit:	    ldd		#portbint
 
 		    lda		pcr
 		    anda	#@00001111
-		    ora		#@10100000
+		    ora		#@10000000 ; port B handshake mode
 		    sta		pcr
 
 		    lda		#enable | cb1flag

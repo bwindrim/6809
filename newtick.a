@@ -35,6 +35,9 @@ init		  redef	intinit
 
 
 main:		begin
+		  lda	#@10001010 ; port B handshake mode, A strobe
+		  sta	pcr
+
 		  jsr	startup
 
 		  jsr	init
@@ -134,7 +137,7 @@ out:		  jsr	putblk
 		end
 
 		begin
-message:	  db	"Hello", 13, 10, 0
+message:	  db	"Xello", 13, 10, 0
 
 startup		entry
 		  ldx	#message

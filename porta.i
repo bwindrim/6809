@@ -8,11 +8,11 @@ intinit:	    ldd		#portaint
 
 		    lda		pcr
 		    anda	#@11110000
-		    ora		#@00001010
+		    ora		#@00001000 ; port A handhake mode
 		    sta		pcr
 
 		    lda		acr
-		    ora		#@00000001
+		    ora		#@00000001 ; port A latch enable
 		    sta		acr
 
 		    lda		#enable | ca1flag
