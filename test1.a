@@ -1,0 +1,38 @@
+		org	$E000
+
+		lds	#$FDFF	; set up system stack
+		jmp	main
+
+		include		"via6522.i"
+
+message:	db	"Hello, this is your startup message!", 13, 10, 0
+
+VIA_PCR		equ		@10001010 ; port B handshake mode, A strobe
+
+main:	begin
+			; set up the 6522
+			lda		#VIA_PCR
+			sta		pcr		   ; write to peripheral control reg
+			; send the startup message
+			ldx		#message
+			jsr		outstring
+		  
+stop:		sbra	stop
+		end
+		
+
+outbyte:	begin
+				sta		portb
+loop:		  	lda		ifr		; wait for data taken
+				anda	#cb1flag
+				sbeq	loop
+				rts
+			end
+
+outstring:	begin
+loop:			lda		,x+		; get next char
+				sbeq	exit	; exit if zero
+				sbsr	outbyte
+				jmp		loop
+exit:			rts
+			end
