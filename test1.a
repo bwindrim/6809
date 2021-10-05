@@ -3,22 +3,79 @@
 		lds	#$FDFF	; set up system stack
 		jmp	main
 
+		include		"vectors.i"
 		include		"via6522.i"
 
 message:	db	"Hello, this is your startup message!", 13, 10, 0
+nmi_msg:	db	"NMI!", 13, 10, 0
+tick_msg:	db	"tick", 13, 10, 0
 
 VIA_PCR		equ		@10001010 ; port B handshake mode, A strobe
 
-main:	begin
-			; set up the 6522
-			lda		#VIA_PCR
-			sta		pcr		   ; write to peripheral control reg
-			; send the startup message
-			ldx		#message
-			jsr		outstring
+nmi_count:	db		3
+
+nmi_isr:	begin		; NMI stacks the full register set
+				inc		nmi_count
+				rti
+			end
+nmi_chk:	begin		; uses atomic dec of nmi_count
+				lda		nmi_count
+				sbeq	exit		; return if nmi_count is zero
+				dec		nmi_count
+				ldx		#nmi_msg
+				jsr		outstring
+exit:			rts
+			end
+
+; constants for 1 second tick message rate
+timeconst	equ		20000		; 10ms @ 2MHz
+count:		db		100			; counts down in 10ms intervals
+
+tick_chk:	begin
+				lda		ifr		; read the VIA interrupt flags
+				anda	#t1flag	; test for timer1
+				sbeq	exit	; exit if not set
+			
+				lda		t1cl	; clear source of interrupt
+				dec		count	; decrement count
+				sbne	exit	; return if count not zero
+
+				lda		#100	; reset the count
+				sta		count
+				ldx		#tick_msg
+				jsr		outstring
+exit:			rts
+			end
+		
+main:		begin
+				sei		; mask IRQ
+				
+				; set up the 6522 ports
+				lda		#VIA_PCR
+				sta		pcr		   ; write to peripheral control reg
+				lda		#enable|cb1flag
+				sta		ier
+				
+				; set up the 6522 timer1
+				ldd		#timeconst
+				exg		a,b
+				std		t1cl
+				lda		acr
+				ora		#t1flag
+				sta		acr
+				
+				; hook the NMI vector
+				ldx		#nmi_isr
+				stx		nmivec
+				
+				; send the startup message
+				ldx		#message
+				jsr		outstring
 		  
-stop:		sbra	stop
-		end
+loop:			jsr		nmi_chk
+				jsr		tick_chk
+				sbra	loop
+			end
 		
 
 outbyte:	begin
