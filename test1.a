@@ -10,7 +10,7 @@ message:	db	"Hello, this is your startup message!", 13, 10, 0
 nmi_msg:	db	"NMI!", 13, 10, 0
 tick_msg:	db	"tick", 13, 10, 0
 
-VIA_PCR		equ		@10001010 ; port B handshake mode, A strobe
+VIA_PCR		equ		@10001000 ; port A & B handshake mode
 
 nmi_count:	db		3
 
@@ -86,10 +86,13 @@ loop:		  	lda		ifr		; wait for data taken
 				rts
 			end
 
-outstring:	begin
-loop:			lda		,x+		; get next char
-				sbeq	exit	; exit if zero
-				sbsr	outbyte
-				jmp		loop
+			begin
+loop1:			sta		portb
+loop2:		  	lda		ifr		; wait for data taken
+				anda	#cb1flag
+				sbeq	loop2
+outstring		entry
+				lda		,x+		; get next char
+				sbne	loop1
 exit:			rts
 			end
