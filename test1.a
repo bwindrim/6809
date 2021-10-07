@@ -12,6 +12,9 @@ tick_msg:	db	"tick", 13, 10, 0
 
 VIA_PCR		equ		@10001000 ; port A & B handshake mode
 
+good:		db	0
+
+
 nmi_count:	db		3
 
 nmi_isr:	begin		; NMI stacks the full register set
@@ -71,7 +74,8 @@ main:		begin
 				; send the startup message
 				ldx		#message
 				jsr		outstring
-		  
+				jsr		chk_mem
+				
 loop:			jsr		nmi_chk
 				jsr		tick_chk
 				sbra	loop
@@ -95,4 +99,105 @@ outstring		entry
 				lda		,x+		; get next char
 				sbne	loop1
 exit:			rts
+			end
+
+
+
+chk_mem:	begin
+				ldx   #0000
+				bsr   newline
+
+loop:		  	lda   ,x
+				tfr   a,b
+				comb
+				stb   ,x
+				cmpb  ,x
+				sbne   notram
+
+isram:		  	sta   ,x
+				lda   good
+				bne   next
+
+				inca
+				sta   good
+				tfr	x,d
+				bsr   hex_word
+				bsr   dash
+				bra   next
+
+notram:		  	lda   good
+				beq   next
+
+				clra
+				sta   good
+				tfr   x,d
+				subd  #1
+				bsr   hex_word
+				bsr   newline
+
+next:		  	leax  256,x
+				cmpx  #$fe00
+				bne   loop
+
+				tfr   x,d
+				subd  #1
+				bsr   hex_word
+				bsr   newline
+				bsr   newline
+				rts
+			end
+
+			begin
+message:	  	db		" - ", 0
+
+dash		entry
+				pshs	x
+				ldx		#message
+				bsr		outstring
+				puls	x
+				rts
+			end
+			
+newline:	begin
+				lda   	#10
+				bsr   	outbyte
+				lda   	#13
+				bsr   	outbyte
+				rts
+			end
+
+
+hex_nybble:	begin
+				pshs	a,b
+				anda	#$0F
+				cmpa	#$A
+				sbhs	alpha
+
+				adda	#'0'
+				sbra	over
+
+alpha:		    adda	#('A' - $A)
+
+over:		    bsr	outbyte
+				puls	a,b,pc
+			end
+
+hex_byte:	begin
+				pshs	a
+				lsra
+				lsra
+				lsra
+				lsra
+				jsr		hex_nybble
+				puls	a
+				jsr		hex_nybble
+				rts
+			end
+
+hex_word:	begin
+				pshs	d
+				jsr		hex_byte
+				lda		1,s
+				jsr		hex_byte
+				puls	d,pc
 			end
