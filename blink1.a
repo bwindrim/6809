@@ -1,0 +1,165 @@
+		org	$E000
+
+		lds	#$FDFF	; set up system stack
+		jmp	main
+
+		include	"init.i"
+		include	"via6522.i"
+		include	"acia6551.i"
+		include	"despatch.i"
+		include	"stream.i"
+		include	"tick.i"
+		include	"porta.i"
+		include	"portb.i"
+		include	"poll.i"
+		include	"toolbox.i"
+		include	"dump.i"
+
+stdin:		dw	portastream
+stdout:		dw	portbstream
+stderr:		dw	portbstream
+
+		begin
+intinit:	  ldd	#badint
+		  ldx	#resetvec
+		  lda	#16
+
+initloop:	  std	,--x
+		  deca
+		  bne	initloop
+
+		  jmp	init
+
+init		  redef	intinit
+		end
+
+
+main:		begin
+		  lda	#@10001010 ; port B handshake mode, A strobe
+		  sta	pcr
+
+		  jsr	startup
+
+		  jsr	init
+		  jsr	startup
+
+;		  jsr	portstat
+		  jsr	startup
+loop:		    jsr		getchar_nw	; get next byte from port
+		    tstb
+		    sbeq	over1
+
+		  jsr	putchar
+over1:	  jmp	loop
+		end
+
+outbyte:	begin
+		  pshs	b,cc
+		  seif
+		  sta	portb
+loop:		  ldb	ifr
+		  andb	#$10
+		  beq	loop
+		  puls	b,cc,pc
+		end
+
+outstring:	begin
+loop:		  lda	,x+
+		  sbeq	out
+		  jsr	outbyte
+		  jmp	loop
+out:		  rts
+		end
+
+putstring:	begin
+		  pshs	a,x,y,b
+		  clra
+		  tfr	x,y
+loop:		  ldb	,x+
+		  sbeq	out
+		  inca
+		  jmp	loop
+
+out:		  jsr	putblk
+
+		  puls	a,x,y,b,pc
+		end
+
+		begin
+message:	  db	"Xello", 13, 10, 0
+
+startup		entry
+		  ldx	#message
+		  jsr	outstring
+		end
+
+		begin
+message:	  db	"Tick7", 13, 10, 0
+led:	  db    1
+
+tick		entry
+          lda	led
+          eora	#1
+          sta	led
+          sta	acia_command
+		  ldy	#message
+		  lda	#7
+		  jsr	putblk
+		  rts
+		end
+
+		begin
+message:	  db	"Bad!", 10, 13, 0
+
+badint		entry
+		  ldx	#message
+loop:		  lda	,x+
+		  sbeq	out
+		  jsr	putchar
+		  jmp	loop
+
+out:		  rti
+		end
+
+getchar:	begin
+		  pshs		b,x,cc
+		  ldx		stdin
+		  getchar
+		  puls		b,x,cc,pc
+		end
+
+getchar_nw:	begin
+		  pshs		x,cc
+		  ldx		stdin
+		  getcharnw
+		  puls		x,cc,pc
+		end
+
+putchar:	begin
+		  pshs		b,x,cc
+		  ldx		stdout
+		  putchar
+		  puls		b,x,cc,pc
+		end
+
+putblk:		begin
+		  pshs		a,b,x,y,cc
+		  ldx		stdout
+		  putblk
+		  puls		a,b,x,y,cc,pc
+		end
+
+puthex:		begin
+		  pshs		x
+		  ldx		stdout
+		  jsr		hex_byte
+		  puls		x,pc
+		end
+
+puthexword:	begin
+		  pshs		x
+		  ldx		stdout
+		  bsr		hex_word
+		  puls		x,pc
+		end
+
