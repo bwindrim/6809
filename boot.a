@@ -9,16 +9,16 @@ loop2:		lda	$FEFF,x
 		sta	$FEFF,x
 		leax	-1,x
 		bne	loop2
-		lda	#$FE
+		lda	#$FE	; point the DP reg to the I/O register space
 		exg	a,dp
-		lda	#0
-		sta	<3
-		lda	#$FF
-		sta	<2
+		lda	#0		; set DDRA to input
+		sta	<3		; $FE03 is DDRA
+		lda	#$FF	; set DDRB to ouput
+		sta	<2		; $FE02 is DDRB
 		lda	#1
-		sta	<$0B
+		sta	<$0B	; $FE0B is ACR
 		lda	#$AA
-		sta	<$0C
+		sta	<$0C	; $FE0C is PCR
 loop3:		ldu	#getbyte
 		exg	u,pc
 		cmpb	#$AA
