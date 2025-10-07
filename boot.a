@@ -4,7 +4,7 @@ loop1:		lda	$EFFF,x
 		sta	$EFFF,x
 		leax	-1,x
 		bne	loop1
-		ldx	#256
+		ldx #256
 loop2:		lda	$FEFF,x
 		sta	$FEFF,x
 		leax	-1,x
@@ -13,11 +13,11 @@ loop2:		lda	$FEFF,x
 		exg	a,dp
 		lda	#0		; set DDRA to input
 		sta	<3		; $FE03 is DDRA
-		lda	#$FF	; set DDRB to ouput
+		lda	#$FF	; set DDRB to output
 		sta	<2		; $FE02 is DDRB
-		lda	#1
+		lda	#1		; ACR  00000001 Timed interrupt, PB7 disabled, timed interrupt, shifter disabled, PB latch disable, PA latch enable
 		sta	<$0B	; $FE0B is ACR
-		lda	#$AA
+		lda	#$AA	; PCR  10101010 CB2 pulse output, CB1 -ve edge, CA2 pulse ouput, CA1 -ve edge
 		sta	<$0C	; $FE0C is PCR
 loop3:		ldu	#getbyte
 		exg	u,pc
@@ -40,14 +40,15 @@ exit:		ldu	#getword
 		exg	u,pc
 		exg	d,pc
 int:		rti
-getword:	lda	<$0D
-		anda	#2
-		beq	getword
-		lda	<1
-		sta	<0
-getbyte:	ldb	<$0D
-		andb	#2
-		beq	getbyte
-		ldb	<1
-		stb	<0
-		exg	u,pc
+getword:	lda	<$0D	; load A from IFR
+		anda	#2		; test CA1 flag
+		beq	getword		; loop if CA1 not set
+		lda	<1			; load A from IRA
+		sta	<0			; store A to ORB (blind echo)
+		; fall through
+getbyte:	ldb	<$0D	; load A from IFR
+		andb	#2		; test CA1 flag
+		beq	getbyte		; loop if CA1 not set
+		ldb	<1			; load A from IRA
+		stb	<0			; store A to ORB (blind echo)
+		exg	u,pc		; return via link address in u
