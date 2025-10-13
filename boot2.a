@@ -1,0 +1,41 @@
+; boot2.a - second-stage bootloader for 6809 board
+;
+			org	$FD00   	; code goes in last 256 bytes of (non-vector) RAM
+			lds	#$FD00  	; stack grows downward from below boot2 code
+			lda	#$FE		; point the DP reg to the I/O register space
+			exg	a,dp
+			lda	#0			; set DDRA to input
+			sta	<3			; $FE03 is DDRA
+			lda	#$FF		; set DDRB to output
+			sta	<2			; $FE02 is DDRB
+			lda	#1			; ACR  00000001 Timed interrupt, PB7 disabled, timed interrupt, shifter disabled, PB latch disable, PA latch enable
+			sta	<$0B		; $FE0B is ACR
+			lda	#$AA		; PCR  10101010 CB2 pulse output, CB1 -ve edge, CA2 pulse ouput, CA1 -ve edge
+			sta	<$0C		; $FE0C is PCR
+wait:		bsr getbyte		; wait for the prefix byte
+			cmpb	#$AA
+			bne	wait
+dload:		bsr	getword		; get the load address
+			exg	d,x			; move it to X
+			bsr	getword		; get the length
+			exg	d,y			; move it to Y
+			leay	1,y		; adjust the length to allow for the initial decrement & test
+byteloop:	leay	-1,y
+			beq	exit		; if Y is zero then we're done reading bytes
+			bsr	getbyte		; get the next byte
+			stb	,x+			; store it in memory
+			bra	byteloop
+exit:		bsr	getword		; get the exec address
+			exg	d,pc		; transfer execution to the exec address
+getword:	lda	<$0D		; load A from IFR
+			anda #2			; test CA1 flag
+			beq	getword		; loop if CA1 not set
+			lda	<1			; load A from IRA
+			sta	<0			; store A to ORB (blind echo, no handshaking)
+			; fall through
+getbyte:	ldb	<$0D		; load A from IFR
+			andb	#2		; test CA1 flag
+			beq	getbyte		; loop if CA1 not set
+			ldb	<1			; load A from IRA
+			stb	<0			; store A to ORB (blind echo, no handshaking)
+			rts				; return from subroutine
