@@ -1,7 +1,7 @@
 ; boot2.a - second-stage bootloader for 6809 board
 ;
-			org	$FD00   	; code+stack goes in last 256 bytes of (non-vector) RAM
-			lds	#$FE00  	; stack grows downward from the very top of RAM below I/O space
+			org	$FF00   	; boot2's code+stack goes in last 256 bytes of RAM
+			lds	#$FFF0  	; stack grows downward from the very top of RAM, below the hardware vectors
 			lda	#$FE		; point the DP reg to the I/O register space
 			exg	a,dp
 			lda	#0			; set DDRA to input
