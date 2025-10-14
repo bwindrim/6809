@@ -12,9 +12,11 @@
 			sta	<$0B		; $FE0B is the 6522's ACR (Auxiliary Control Register)
 			lda	#$AA		; set PCR to 10101010 CB2 pulse output, CB1 -ve edge, CA2 pulse ouput, CA1 -ve edge
 			sta	<$0C		; $FE0C is the 6522's PCR (Program Control Register)
+restart:
 wait:		bsr getbyte		; wait for the prefix byte
 			cmpb	#$AA
 			bne	wait
+
 dload:		bsr	getword		; get the load address
 			exg	d,x			; move it to X
 			bsr	getword		; get the length
@@ -25,17 +27,23 @@ byteloop:	leay	-1,y	; decrement the length count
 			bsr	getbyte		; get the next byte
 			stb	,x+			; store it in memory
 			bra	byteloop
-exit:		bsr	getword		; get the exec address
+
+exit:		ldx	#restart	; restart address of boot2 code
+			pshs X			; push the address onto the stack
+			bsr	getword		; get the exec address
 			exg	d,pc		; transfer execution to the exec address
+
 getword:	lda	<$0D		; load A from IFR
 			anda #2			; test CA1 (Port A Data Ready) flag
 			beq	getword		; loop if no data ready
+
 			lda	<1			; load A from IRA
 			sta	<0			; store A to ORB (blind echo, no handshaking)
 			; fall through
 getbyte:	ldb	<$0D		; load A from IFR
 			andb	#2		; test CA1 (Port A Data Ready) flag
 			beq	getbyte		; loop if no data ready
+
 			ldb	<1			; load B from IRA
 			stb	<0			; store B to ORB (blind echo, no handshaking)
 			rts				; return from subroutine
