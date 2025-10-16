@@ -1,20 +1,22 @@
 ; boot2.a - second-stage bootloader for 6809 board
 ;
+			include			"via6522.i"
+			
 			org	$FF00   	; boot2's code+stack goes in last 256 bytes of RAM
+
 			lds	#$FFF0  	; stack grows downward from the very top of RAM, below the hardware vectors
-			lda	#$FE		; point the DP reg to the I/O register space
-			exg	a,dp
+
 			lda	#0			; set DDRA to input
-			sta	<3			; $FE03 is the 6522's DDRA (Port A Data Direction Register)
+			sta	ddra		; $FE03 is the 6522's DDRA (Port A Data Direction Register)
 			lda	#$FF		; set DDRB to output
-			sta	<2			; $FE02 is the 6522's DDRB (Port B Data Direction Register)
+			sta	ddrb		; set Port B Data Direction Register
 			lda	#1			; set ACR to 00000001 Timed interrupt, PB7 disabled, timed interrupt, shifter disabled, PB latch disable, PA latch enable
-			sta	<$0B		; $FE0B is the 6522's ACR (Auxiliary Control Register)
+			sta	acr			; set Auxiliary Control Register
 			lda	#$AA		; set PCR to 10101010 CB2 pulse output, CB1 -ve edge, CA2 pulse ouput, CA1 -ve edge
-			sta	<$0C		; $FE0C is the 6522's PCR (Program Control Register)
+			sta	pcr			; set Program Control Register
 restart:
-wait:		bsr getbyte		; wait for the prefix byte
-			cmpb	#$AA
+wait:		bsr getbyte		; wait for the download prefix byte
+			cmpb #$AA
 			bne	wait
 
 dload:		bsr	getword		; get the load address
@@ -33,17 +35,17 @@ exit:		ldx	#restart	; restart address of boot2 code
 			bsr	getword		; get the exec address
 			exg	d,pc		; transfer execution to the exec address
 
-getword:	lda	<$0D		; load A from IFR
+getword:	lda	ifr			; load A from IFR
 			anda #2			; test CA1 (Port A Data Ready) flag
 			beq	getword		; loop if no data ready
 
-			lda	<1			; load A from IRA
-			sta	<0			; store A to ORB (blind echo, no handshaking)
+			lda	porta		; load A from port A input register
+			sta	portb		; store A to port B output register (blind echo, no handshaking)
 			; fall through
-getbyte:	ldb	<$0D		; load A from IFR
+getbyte:	ldb	ifr			; load A from IFR
 			andb	#2		; test CA1 (Port A Data Ready) flag
 			beq	getbyte		; loop if no data ready
 
-			ldb	<1			; load B from IRA
-			stb	<0			; store B to ORB (blind echo, no handshaking)
+			ldb	porta		; load B from port A input register
+			stb portb		; store B to port B pitput register (blind echo, no handshaking)
 			rts				; return from subroutine
