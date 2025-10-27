@@ -10,9 +10,9 @@
 			sta	ddra		; $FE03 is the 6522's DDRA (Port A Data Direction Register)
 			lda	#$FF		; set DDRB to output
 			sta	ddrb		; set Port B Data Direction Register
-			lda	#1			; set ACR to 00000001 Timed interrupt, PB7 disabled, timed interrupt, shifter disabled, PB latch disable, PA latch enable
+			lda	#1			; set ACR to 00000001 (Timer interrupt, PB7 disabled, timed interrupt, shifter disabled, PB latch disable, PA latch enable)
 			sta	acr			; set Auxiliary Control Register
-			lda	#$AA		; set PCR to 10101010 CB2 pulse output, CB1 -ve edge, CA2 pulse ouput, CA1 -ve edge
+			lda	#$AA		; set PCR to 10101010 (CB2 pulse output, CB1 -ve edge, CA2 pulse output, CA1 -ve edge)
 			sta	pcr			; set Program Control Register
 restart:
 wait:		bsr getbyte		; wait for the download prefix byte
