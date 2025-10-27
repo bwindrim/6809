@@ -35,6 +35,8 @@ init		  redef	intinit
 
 
 main:		begin
+		  lda	#$FF
+		  sta	ddrb
 		  lda	#@10001010 ; port B handshake mode, A strobe
 		  sta	pcr
 
