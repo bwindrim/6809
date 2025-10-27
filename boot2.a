@@ -4,21 +4,21 @@
 			
 			org	$FF00   	; boot2's code+stack goes in last 256 bytes of RAM
 
-			lds	#$FFF0  	; stack grows downward from the very top of RAM, below the hardware vectors
+			lds	#$FFF0  	; stack grows downward from near the very top of RAM, below the hardware vectors
 
-			lda	#0			; set DDRA to input
-			sta	ddra		; $FE03 is the 6522's DDRA (Port A Data Direction Register)
-			lda	#$FF		; set DDRB to output
-			sta	ddrb		; set Port B Data Direction Register
-			lda	#1			; set ACR to 00000001 (Timer interrupt, PB7 disabled, timed interrupt, shifter disabled, PB latch disable, PA latch enable)
+			lda	#0			; set DDRA and DDRB to input
+			sta	ddra		; set Port A Data Direction Register to input
+			sta	ddrb		; set Port B Data Direction Register to input
+			lda	#1			; set ACR to 00000001 (timer interrupt, PB7 disabled, shifter disabled, PB latch disable, PA latch enable)
 			sta	acr			; set Auxiliary Control Register
-			lda	#$AA		; set PCR to 10101010 (CB2 pulse output, CB1 -ve edge, CA2 pulse output, CA1 -ve edge)
+			lda	#$0A		; set PCR to 00001010 (CB2 input -ve edge, CB1 -ve edge, CA2 pulse output, CA1 -ve edge)
 			sta	pcr			; set Program Control Register
 restart:
 wait:		bsr getbyte		; wait for the download prefix byte
 			cmpb #$AA
 			bne	wait
 
+			; We've got the prefix byte, start download
 dload:		bsr	getword		; get the load address
 			exg	d,x			; move it to X
 			bsr	getword		; get the length
@@ -28,7 +28,7 @@ byteloop:	leay	-1,y	; decrement the length count
 			beq	exit		; if Y is zero then we're done reading bytes
 			bsr	getbyte		; get the next byte
 			stb	,x+			; store it in memory
-			bra	byteloop
+			sbra byteloop
 
 exit:		ldx	#restart	; restart address of boot2 code
 			pshs X			; push the address onto the stack
@@ -37,15 +37,13 @@ exit:		ldx	#restart	; restart address of boot2 code
 
 getword:	lda	ifr			; load A from IFR
 			anda #2			; test CA1 (Port A Data Ready) flag
-			beq	getword		; loop if no data ready
+			sbeq getword	; loop if no data ready
 
 			lda	porta		; load A from port A input register
-			sta	portb		; store A to port B output register (blind echo, no handshaking)
 			; fall through
 getbyte:	ldb	ifr			; load A from IFR
 			andb	#2		; test CA1 (Port A Data Ready) flag
-			beq	getbyte		; loop if no data ready
+			sbeq getbyte	; loop if no data ready
 
 			ldb	porta		; load B from port A input register
-			stb portb		; store B to port B pitput register (blind echo, no handshaking)
 			rts				; return from subroutine
