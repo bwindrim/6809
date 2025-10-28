@@ -60,7 +60,7 @@ outbyte:	begin
 		  seif
 		  sta	portb
 loop:		  ldb	ifr
-		  andb	#$10
+		  andb	#cb1flag
 		  beq	loop
 		  puls	b,cc,pc
 		end

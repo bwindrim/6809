@@ -15,7 +15,6 @@
 		include	"dump.i"
 
 stdout:		dw	portastream
-stderr:		dw	portastream
 
 		begin
 intinit:	  ldd	#badint
@@ -36,11 +35,11 @@ main:		begin
 
 				; delay loop (~1000*1000 iterations)
 				; allows time before setting port A to output
-delay:	  ldx	#1000
+delay:	  ldx	#250
 outer:    ldy	#1000
 inner:    leay -1,y
 		  bne	inner
-		  leay -1,y
+		  leax -1,x
 		  bne	outer
 
 		  lda	#$FF
@@ -61,9 +60,9 @@ loop:	  jmp	loop
 outbyte:	begin
 		  pshs	b,cc
 		  seif
-		  sta	portb
+		  sta	porta
 loop:		  ldb	ifr
-		  andb	#$10
+		  andb	#ca1flag
 		  beq	loop
 		  puls	b,cc,pc
 		end

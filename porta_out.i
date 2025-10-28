@@ -19,11 +19,8 @@ init		    redef		intinit
 		  end
 
 portawake:	  begin			; outgoing port wakeup routine
-;		    jsr	wake_mess
 		    ldb	#enable | ca1flag ; call only with interrupts disabled
 		    stb	ier
-;		    lda		#'W'
-;		    sta		porta
 		    rts
 		  end
 
@@ -40,9 +37,6 @@ portaint:				; outgoing port interrupt handler
 
 empty:		    lda		#disable | ca1flag
 		    sta		ier
-;		    lda		#'S'
-;		    sta		porta
-;		    jsr		sleep_mess
 		    rtdesp
 		  end
 		end
