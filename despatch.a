@@ -1,0 +1,48 @@
+        ; despatch.a - interrupt despatcher for 6809
+
+        include "via6522.i"
+
+        ; Hardware interrupt vectors.
+resetvec	equ	$FFFE       ; reset vector
+nmivec		equ	$FFFC       ; NMI vector
+swivec		equ	$FFFA       ; SWI vector
+irqvec		equ	$FFF8       ; IRQ vector
+firqvec		equ	$FFF6       ; FIRQ vector
+swi2vec		equ	$FFF4       ; SWI2 vector
+swi3vec		equ	$FFF2       ; SWI3 vector
+	    ; Despatcher interrupt vectors.
+unknownvec	equ	$FFF0       ; Unknown vector, i.e. not from 6522
+ca2vec		equ	$FFEE       ; CA2 vector
+ca1vec		equ	$FFEC       ; CA1 vector
+srvec		equ	$FFEA       ; SR vector
+cb2vec		equ	$FFE8       ; CB2 vector
+cb1vec		equ	$FFE6       ; CB1 vector
+t2vec		equ	$FFE4       ; T2 vector
+t1vec		equ	$FFE2       ; T1 vector
+viabadvec	equ	$FFE0       ; vector for spurious 6522 interrupts
+
+        ORG     $0000           ; This is a relocatable module.
+
+        ; Initialisation routine to set up the interrupt despatcher.
+init_despatcher:
+                                ; ToDo: set up default ISRs for each vector.
+        ldx		irqvec          ; Copy the current IRQ vector
+        stx		unknownvec      ; to the "unknown" vector.
+        leax	intdespatch,pcr ; Put the address of the despatcher
+        stx		irqvec          ; into the IRQ vector.
+        rts                     ; Done, return to the loader.
+
+        ; 6522 VIA interrupt despatcher.
+intdespatch:                    ; 6809 IRQ entry point.
+        ldx     #unknownvec     ; Default to "unknown" vector.
+        lda     ifr             ; Read interrupt flag register.
+        sbpl    out             ; Branch if no interrupts pending.
+
+        anda    ier             ; Mask with interrupt enable register.
+        ora     #$80            ; Set last bit to ensure default vec.
+
+loop:   leax    -2,x            ; Loop through vectors
+        asra                    ; testing each interrupt bit, LSB first.
+        sbcc    loop            ; Loop unless the bit was set.
+
+out:    jmp     [,x]            ; Jump to the selected interrupt vector.
