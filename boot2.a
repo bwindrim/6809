@@ -1,18 +1,24 @@
 ; boot2.a - second-stage bootloader for 6809 board
 ;
 			include			"via6522.i"
+
+g_memtop	equ	$FFFE   	; aliased to the reset vector
 			
 			org	$FF00   	; boot2's code+stack goes in last 256 bytes of RAM
 
-			lds	#$FFF0  	; stack grows downward from near the very top of RAM, below the hardware vectors
+			lds	#$FFE0  	; stack grows downward from near the very top of RAM, below the 6809 (HW) and 6522 (SW) vectors
 
 			lda	#0			; set DDRA and DDRB to input
 			sta	ddra		; set Port A Data Direction Register to input
 			sta	ddrb		; set Port B Data Direction Register to input
-			lda	#1			; set ACR to 00000001 (timer interrupt, PB7 disabled, shifter disabled, PB latch disable, PA latch enable)
+			lda	#@00000001	; set ACR to: timer interrupt, PB7 disabled, shifter disabled, PB latch disable, PA latch enable
 			sta	acr			; set Auxiliary Control Register
-			lda	#$08		; set PCR to 00001000 (CB2 input -ve edge, CB1 -ve edge, CA2 handshake output, CA1 -ve edge)
+			lda	#@00001000	; set PCR to: CB2 input -ve edge, CB1 -ve edge, CA2 handshake output, CA1 -ve edge
 			sta	pcr			; set Program Control Register
+
+			ldx	#$FE00		; One beyond the end of RAM,
+			stx	g_memtop;	; this will be the default stacktop for programs
+			
 restart:
 wait:		bsr getbyte		; wait for the download prefix byte
 			cmpb #$AA

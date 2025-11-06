@@ -1,6 +1,8 @@
 		org	$E000
 
-		lds	#$FDFF	; set up system stack
+		include	"globals.i"
+
+		lds	g_memtop	; set up system stack
 		jmp	main
 
 		include	"init.i"
