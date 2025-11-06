@@ -28,5 +28,5 @@ inthndl:	  lda	t1cl	; clear source of interrupt
 		  sta	count
 		  clif
 		  bsr	tick
-out:		  rtdesp
+out:		  rti
 		end

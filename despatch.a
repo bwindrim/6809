@@ -8,14 +8,15 @@
         ; Initialisation routine to set up the interrupt despatcher.
 init_despatcher:
                                 ; ToDo: set up default ISRs for each vector.
-        ldx		g_irqvec        ; Copy the current IRQ vector
-        stx		g_unknownvec    ; to the "unknown" vector.
+        ldx	g_irqvec        ; Copy the current IRQ vector
+        stx	g_unknownvec    ; to the "unknown" vector.
         leax	intdespatch,pcr ; Put the address of the despatcher
-        stx		g_irqvec        ; into the IRQ vector.
+        stx	g_irqvec        ; into the IRQ vector.
         rts                     ; Done, return to the loader.
 
         ; 6522 VIA interrupt despatcher.
 intdespatch:                    ; 6809 IRQ entry point.
+        nop                     ; needed because of error in pcr assembly, above
         ldx     #g_unknownvec   ; Default to "unknown" vector.
         lda     ifr             ; Read interrupt flag register.
         sbpl    out             ; Branch if no interrupts pending.

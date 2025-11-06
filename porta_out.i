@@ -33,11 +33,11 @@ portaint:				; outgoing port interrupt handler
 		    sbeq	empty
 
 		    sta		porta
-		    rtdesp
+		    rti
 
 empty:		    lda		#disable | ca1flag
 		    sta		ier
-		    rtdesp
+		    rti
 		  end
 		end
 
