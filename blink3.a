@@ -11,7 +11,6 @@
 		include	"stream.i"
 		include	"tick.i"
 		include	"porta_out.i"
-;		include	"poll.i"
 		include	"toolbox.i"
 		include	"dump.i"
 
@@ -20,7 +19,7 @@ stdout:		dw	portastream
 
 main:		begin
 
-				; delay loop (~1000*1000 iterations)
+				; delay loop (~250*1000 iterations)
 				; allows time before setting port A to output
 delay:	  ldx	#250
 outer:    ldy	#1000
@@ -34,14 +33,9 @@ inner:    leay -1,y
 		  lda	#@00001000		; set PCR to 00001000 (CB2 input -ve edge, CB1 -ve edge, CA2 handshake output, CA1 -ve edge)
 		  sta	pcr
 
-		  clif					; enable interrupts
-		  jsr	startup
-
 		  jsr	init
 		  jsr	startup
 
-;		  jsr	portstat
-		  jsr	startup
 loop:	  jmp	loop
 		end
 

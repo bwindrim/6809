@@ -1,12 +1,11 @@
 ; boot2.a - second-stage bootloader for 6809 board
 ;
+			include			"globals.i"
 			include			"via6522.i"
 
-g_memtop	equ	$FFFE   	; aliased to the reset vector
-			
 			org	$FF00   	; boot2's code+stack goes in last 256 bytes of RAM
 
-			lds	#$FFE0  	; stack grows downward from near the very top of RAM, below the 6809 (HW) and 6522 (SW) vectors
+			lds	#g_base  	; stack grows downward from near the very top of RAM, below the 6809 (HW) and 6522 (SW) vectors
 
 			lda	#0			; set DDRA and DDRB to input
 			sta	ddra		; set Port A Data Direction Register to input

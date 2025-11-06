@@ -7,9 +7,11 @@ OBJ=$(SRC:.a=.ex9)
 
 all: $(OBJ)
 
-boot2.ex9: boot2.a via6522.i
+boot2.ex9: boot2.a via6522.i globals.i
 
 despatch.ex9: despatch.a via6522.i globals.i
+
+timer1.ex9: timer1.a via6522.i globals.i
 
 blink3.ex9: blink3.a via6522.i globals.i init.i acia6551.i despatch.i stream.i tick.i porta_out.i poll.i toolbox.i dump.i
 

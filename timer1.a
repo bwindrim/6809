@@ -1,0 +1,32 @@
+timeconst	equ	    2000     ; timer1 constant for tick interrupts, 1ms at 2MHz
+
+            include "via6522.i"
+            include "globals.i"
+
+            ORG     $0000           ; This is a relocatable module.
+
+        	leax	tick_isr,pcr
+		    stx		t1vec
+		    ldd		#timeconst
+		    exg		a,b
+		    std		t1cl
+		    lda		acr
+		    ora		#@01000000
+		    sta		acr
+		    lda		#enable | t1flag
+		    sta		ier
+            leax    tick_def,pcr
+            stx     g_tickvec
+		    rts		  
+
+tick_isr:
+            nop                     ; needed because of error in pcr assembly, above
+            lda     t1cl	        ; clear source of interrupt
+            ldd     g_ticks         ; load tick counter
+            incd                    ; increment tick counter
+            std     g_ticks         ; store tick counter
+            jmp     [g_tickvec]     ; chain to tick handler
+
+tick_def:
+            nop                     ; needed because of error in pcr assembly, above
+            rti
