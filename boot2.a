@@ -25,9 +25,13 @@ wait:		bsr getbyte		; wait for the download prefix byte
 
 			; We've got the prefix byte, start download
 dload:		bsr	getword		; get the load address
-			exg	d,x			; move it to X
+			tfr	d,x			; move it to X
+			cmpd	#$F000  ; if load address is in high memory
+			blo low_mem
+			std g_memtop 	; set new stacktop for high-mem programs
+low_mem:					; fall through to read the length and data
 			bsr	getword		; get the length
-			exg	d,y			; move it to Y
+			tfr	d,y			; move it to Y
 			leay	1,y		; increment the length to allow for the initial decrement & test (length may be zero)
 byteloop:	leay	-1,y	; decrement the length count
 			beq	exit		; if Y is zero then we're done reading bytes
