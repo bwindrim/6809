@@ -28,4 +28,12 @@ g_viabadvec	equ	$FFE0   ; vector for spurious 6522 interrupts
 g_tickvec       equ	$FFDE   ; 1ms tick interrupt vector
 g_ticks         equ	$FFDC   ; rolling tick counter
 
+        ; Std IO globals.
+        ; These point to subroutines that implement standard IO semantics,
+        ; i.e. they take a memory address in X and a size in D. The number of
+        ; bytes actually processed is returned in D.
+g_stderr      equ	$FFDA   ; standard error procedure address
+g_stdout      equ	$FFD8   ; standard output procedure address
+g_stdin       equ	$FFD6   ; standard input procedure address
+        ; General globals.
 g_base          equ	$FFC0   ; base address for globals

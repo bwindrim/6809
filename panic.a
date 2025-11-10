@@ -6,18 +6,38 @@
         ORG     $0000           ; This is a relocatable module.
 
         leax    panic,pcr       ; Copy the address of the panic handler
-        stx     g_swivec        ; to the SWI1 vector
+        stx     g_swivec        ; to the SWI1 vector.
+        leax    stderr,pcr      ; Copy the address of the stderr handler
+        stx     g_stderr        ; to the stderr vector.
         rts                     ; Done, return to the loader.
 
-panic:                          ; 6809 SWI1 entry point.
-        nop                     ; needed because of error in pcr assembly, above
-        ldx     10,s            ; Get saved PC from stack (points at panic string)
-outer:  lda     ,x+
-        beq     done            ; End of string?
-        sta     porta
-inner:  ldb     ifr
-        andb    #ca1flag
-        beq     inner
-        bra     outer
+stderr: begin
+            nop                 ; needed because of error in pcr assembly, above
+            pshs    y
+            tfr     d,y         ; use Y as the length count
+outer:      lda     ,x+         ; get next byte
+            sta     porta       ; output to port A
+inner:      ldb     ifr         ; wait for "data taken"
+            andb    #ca1flag
+            beq     inner
 
-done:   bra done                ; Loop here forever.
+            leay    -1,y        ; decrement length
+            bne     outer       ; loop if not zero
+            puls    y,pc        ; restore Y and return
+        end
+
+panic:  begin                   ; 6809 SWI entry point.
+            nop                 ; needed because of error in pcr assembly, above
+            ldx     10,s        ; Get saved PC from stack (points at panic string)
+            ; Get the length of the panic string
+            ldd #0               ; Clear D (length counter)
+count:      lda     ,x+         ; Get next byte of string
+            beq     done        ; End of string?
+            addd    #1          ; Increment length counter
+            bra     count
+
+done:       ldx     10,s        ; Get saved PC from stack again
+            jsr     [g_stderr]  ; Output the panic string
+
+loopstop:   bra loopstop        ; Loop here forever.
+        end  
