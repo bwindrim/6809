@@ -1,0 +1,132 @@
+		org	$E000
+
+		include	"globals.i"
+
+		lds	g_memtop	; set up system stack
+		jmp	main
+
+		include	"init.i"
+		include	"via6522.i"
+		include	"acia6551.i"
+		include	"stream.i"
+		include	"porta_out.i"
+		include	"toolbox.i"
+		include	"dump.i"
+
+stdout:		dw	portastream
+start:      dw  0
+start_msg:  db	"Hello", 13, 10, 0
+tick_msg:	db	"Tick", 13, 10, 0
+led:	    db    1
+
+main:		begin
+
+				; delay loop (~250*1000 iterations)
+				; allows time before setting port A to output
+delay:	  ldx	#250
+outer:    ldy	#1000
+inner:    leay -1,y
+		  bne	inner
+		  leax -1,x
+		  bne	outer
+
+		  lda	#$FF
+		  sta	ddra ; set port A to output
+		  lda	#@00001000		; set PCR to 00001000 (CB2 input -ve edge, CB1 -ve edge, CA2 handshake output, CA1 -ve edge)
+		  sta	pcr
+
+		  jsr	init
+		  ldx	#start_msg
+		  jsr	outstring
+
+loopstart:
+          ldd    g_ticks
+          std    start
+loop:	
+          ldd    g_ticks
+          subd   start
+          cmpd   #1000        ; 1000 ticks = 0.5 seconds
+          blo	loop            ; unsigned "less than" branch
+
+          lda	led
+          eora	#1
+          sta	led
+          sta	acia_command
+		  ldx	#tick_msg
+		  jsr	outstring
+          bra   loopstart
+		end
+
+outbyte:	begin
+		  pshs	b,cc
+		  seif
+		  sta	porta
+loop:		  ldb	ifr
+		  andb	#ca1flag
+		  beq	loop
+		  puls	b,cc,pc
+		end
+
+outstring:	begin
+loop:		  lda	,x+
+		  sbeq	out
+		  jsr	outbyte
+		  jmp	loop
+out:		  rts
+		end
+
+putstring:	begin
+		  pshs	a,x,y,b
+		  clra
+		  tfr	x,y
+loop:		  ldb	,x+
+		  sbeq	out
+		  inca
+		  jmp	loop
+
+out:		  jsr	putblk
+
+		  puls	a,x,y,b,pc
+		end
+
+		begin
+message:	  db	"Bad!", 10, 13, 0
+
+badint		entry
+		  ldx	#message
+loop:		  lda	,x+
+		  sbeq	out
+		  jsr	putchar
+		  jmp	loop
+
+out:		  rti
+		end
+
+putchar:	begin
+		  pshs		b,x,cc
+		  ldx		stdout
+		  putchar
+		  puls		b,x,cc,pc
+		end
+
+putblk:		begin
+		  pshs		a,b,x,y,cc
+		  ldx		stdout
+		  putblk
+		  puls		a,b,x,y,cc,pc
+		end
+
+puthex:		begin
+		  pshs		x
+		  ldx		stdout
+		  jsr		hex_byte
+		  puls		x,pc
+		end
+
+puthexword:	begin
+		  pshs		x
+		  ldx		stdout
+		  bsr		hex_word
+		  puls		x,pc
+		end
+

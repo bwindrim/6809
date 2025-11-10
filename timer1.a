@@ -23,7 +23,7 @@ tick_isr:
             nop                     ; needed because of error in pcr assembly, above
             lda     t1cl	        ; clear source of interrupt
             ldd     g_ticks         ; load tick counter
-            incd                    ; increment tick counter
+            addd    #1              ; increment tick counter
             std     g_ticks         ; store tick counter
             jmp     [g_tickvec]     ; chain to tick handler
 

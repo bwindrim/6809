@@ -21,7 +21,7 @@ acia_irq	equ	@10000000
 ; control register fields
 
 baud_mask	equ	@00001111
-baud_external	equ	@00000000
+baud_ext	equ	@00000000
 baud_50		equ	@00000001
 baud_75		equ	@00000010
 baud_110	equ	@00000011
