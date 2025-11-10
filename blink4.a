@@ -1,10 +1,11 @@
-		org	$E000
+		org	$4000
 
 		include	"globals.i"
 
 		lds	g_memtop	; set up system stack
 		jmp	main
 
+        include "panic.i"
 		include	"init.i"
 		include	"via6522.i"
 		include	"acia6551.i"
@@ -54,6 +55,7 @@ loop:
           sta	acia_command
 		  ldx	#tick_msg
 		  jsr	outstring
+          PANIC "Test Panic from blink4"
           bra   loopstart
 		end
 
