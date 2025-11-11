@@ -6,21 +6,7 @@
 timeconst	equ	    2000            ; timer1 constant for tick interrupts, 1ms at 2MHz.
 
             ORG     $0000           ; This is a relocatable module.
-
-            ; Initialisation routine to set up Timer 1.
-        	leax	timer1_isr,pcr  ; Copy address of timer1_isr
-		    stx		t1vec           ; to Timer 1 interrupt vector.
-		    ldd		#timeconst      ; Load timer1 constant.
-		    exg		a,b             ; Byteswap (6522 is little-endian).
-		    std		t1cl            ; Store to Timer 1.
-		    lda		acr             ; Read 6522 Auxiliary Control Register.
-		    ora		#T1_CONTINUOUS  ; Set Timer 1 to continuous mode.
-		    sta		acr             ; Store back to ACR.
-		    lda		#enable|t1flag  ; Enable Timer 1 interrupt
-		    sta		ier             ; by writing to the 6522 Interrupt Enable Register.
-            leax    tick_def,pcr    ; Copy address of the default tick handler
-            stx     g_tickvec       ; to the tick vector.
-		    rts		  
+			EXEC	init
 
             ; Timer 1 interrupt service routine.
 timer1_isr: begin
@@ -35,3 +21,18 @@ tick_def        entry               ; Default tick handler - does nothing.
                 nop                 ; Needed because of error in pcr assembly, above.
                 rti                 ; Return from interrupt.
             end
+
+            ; Initialisation routine to set up Timer 1.
+init:   	leax	timer1_isr,pcr  ; Copy address of timer1_isr
+		    stx		t1vec           ; to Timer 1 interrupt vector.
+		    ldd		#timeconst      ; Load timer1 constant.
+		    exg		a,b             ; Byteswap (6522 is little-endian).
+		    std		t1cl            ; Store to Timer 1.
+		    lda		acr             ; Read 6522 Auxiliary Control Register.
+		    ora		#T1_CONTINUOUS  ; Set Timer 1 to continuous mode.
+		    sta		acr             ; Store back to ACR.
+		    lda		#enable|t1flag  ; Enable Timer 1 interrupt
+		    sta		ier             ; by writing to the 6522 Interrupt Enable Register.
+            leax    tick_def,pcr    ; Copy address of the default tick handler
+            stx     g_tickvec       ; to the tick vector.
+		    rts		  

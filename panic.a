@@ -4,15 +4,7 @@
         include "via6522.i"
 
         ORG     $0000           ; This is a relocatable module.
-
-        ; Initialisation routine to set up the panic handler and stderr.
-        begin
-            leax    panic,pcr   ; Copy the address of the panic handler
-            stx     g_swivec    ; to the SWI vector.
-            leax    stderr,pcr  ; Copy the address of the stderr handler
-            stx     g_stderr    ; to the stderr vector.
-            rts                 ; Done, return to the loader.
-        end
+        EXEC    init
 
         ; Default stderr routine, outputs to port A.
 stderr: begin
@@ -48,4 +40,14 @@ done:       ldx     10,s        ; Get saved PC from stack again.
             jsr     [g_stderr]  ; Output the panic string.
 
 loopstop:   bra loopstop        ; Loop here forever, with interrupts disabled.
-        end  
+        end
+
+        ; Initialisation routine to set up the panic handler and stderr.
+init:   begin
+            leax    panic,pcr   ; Copy the address of the panic handler
+            stx     g_swivec    ; to the SWI vector.
+            leax    stderr,pcr  ; Copy the address of the stderr handler
+            stx     g_stderr    ; to the stderr vector.
+            rts                 ; Done, return to the loader.
+        end
+
