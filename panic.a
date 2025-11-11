@@ -1,43 +1,51 @@
         ; panic.a - fatal error handler for 6809
 
-        include "via6522.i"
         include "globals.i"
+        include "via6522.i"
 
         ORG     $0000           ; This is a relocatable module.
 
-        leax    panic,pcr       ; Copy the address of the panic handler
-        stx     g_swivec        ; to the SWI1 vector.
-        leax    stderr,pcr      ; Copy the address of the stderr handler
-        stx     g_stderr        ; to the stderr vector.
-        rts                     ; Done, return to the loader.
-
-stderr: begin
-            nop                 ; needed because of error in pcr assembly, above
-            pshs    y
-            tfr     d,y         ; use Y as the length count
-outer:      lda     ,x+         ; get next byte
-            sta     porta       ; output to port A
-inner:      ldb     ifr         ; wait for "data taken"
-            andb    #ca1flag
-            beq     inner
-
-            leay    -1,y        ; decrement length
-            bne     outer       ; loop if not zero
-            puls    y,pc        ; restore Y and return
+        ; Initialisation routine to set up the panic handler and stderr.
+        begin
+            leax    panic,pcr   ; Copy the address of the panic handler
+            stx     g_swivec    ; to the SWI vector.
+            leax    stderr,pcr  ; Copy the address of the stderr handler
+            stx     g_stderr    ; to the stderr vector.
+            rts                 ; Done, return to the loader.
         end
 
+        ; Default stderr routine, outputs to port A.
+stderr: begin
+            nop                 ; Needed because of error in pcr assembly, above.
+            pshs    y,d         ; Save Y (preserved) and D (return value) registers.
+            tfr     d,y         ; Use Y as the length count.
+            ; Loop over the bytes in the buffer, outputting to port A.
+outer:      lda     ,x+         ; Get next byte.
+            sta     porta       ; Output to port A.
+            ; Wait for "data taken":
+inner:      ldb     ifr         ; Load the Interrupt Flag Register.
+            andb    #ca1flag    ; test CA1 (Port A Data Taken) flag.
+            beq     inner       ; loop if not set.
+            ; The byte has been output, continue.
+            leay    -1,y        ; Decrement length.
+            bne     outer       ; Loop if not zero.
+            ; Done outputting, restore registers.
+            puls    y,d,pc      ; Return, restoring Y and D.
+        end
+
+        ; Default panic handler, outputs to [g_stderr].
 panic:  begin                   ; 6809 SWI entry point.
-            nop                 ; needed because of error in pcr assembly, above
-            ldx     10,s        ; Get saved PC from stack (points at panic string)
-            ; Get the length of the panic string
-            ldd #0               ; Clear D (length counter)
-count:      lda     ,x+         ; Get next byte of string
-            beq     done        ; End of string?
-            addd    #1          ; Increment length counter
+            nop                 ; Needed because of error in pcr assembly, above.
+            ldx     10,s        ; Get saved PC from stack (points at panic string).
+            ; Count the length of the panic string.
+            ldd     #0          ; Clear D (length counter).
+count:      lda     ,x+         ; Get next byte of string.
+            beq     done        ; Is this the end of the string?
+            addd    #1          ; Increment length counter.
             bra     count
+            ; Output the panic string to stderr.
+done:       ldx     10,s        ; Get saved PC from stack again.
+            jsr     [g_stderr]  ; Output the panic string.
 
-done:       ldx     10,s        ; Get saved PC from stack again
-            jsr     [g_stderr]  ; Output the panic string
-
-loopstop:   bra loopstop        ; Loop here forever.
+loopstop:   bra loopstop        ; Loop here forever, with interrupts disabled.
         end  

@@ -1,32 +1,37 @@
-timeconst	equ	    2000     ; timer1 constant for tick interrupts, 1ms at 2MHz
+        ; 6809+6522 VIA Timer 1 setup for generating 1ms tick interrupts.
 
             include "via6522.i"
             include "globals.i"
 
+timeconst	equ	    2000            ; timer1 constant for tick interrupts, 1ms at 2MHz.
+
             ORG     $0000           ; This is a relocatable module.
 
-        	leax	tick_isr,pcr
-		    stx		t1vec
-		    ldd		#timeconst
-		    exg		a,b
-		    std		t1cl
-		    lda		acr
-		    ora		#@01000000
-		    sta		acr
-		    lda		#enable | t1flag
-		    sta		ier
-            leax    tick_def,pcr
-            stx     g_tickvec
+            ; Initialisation routine to set up Timer 1.
+        	leax	timer1_isr,pcr  ; Copy address of timer1_isr
+		    stx		t1vec           ; to Timer 1 interrupt vector.
+		    ldd		#timeconst      ; Load timer1 constant.
+		    exg		a,b             ; Byteswap (6522 is little-endian).
+		    std		t1cl            ; Store to Timer 1.
+		    lda		acr             ; Read 6522 Auxiliary Control Register.
+		    ora		#T1_CONTINUOUS  ; Set Timer 1 to continuous mode.
+		    sta		acr             ; Store back to ACR.
+		    lda		#enable|t1flag  ; Enable Timer 1 interrupt
+		    sta		ier             ; by writing to the 6522 Interrupt Enable Register.
+            leax    tick_def,pcr    ; Copy address of the default tick handler
+            stx     g_tickvec       ; to the tick vector.
 		    rts		  
 
-tick_isr:
-            nop                     ; needed because of error in pcr assembly, above
-            lda     t1cl	        ; clear source of interrupt
-            ldd     g_ticks         ; load tick counter
-            addd    #1              ; increment tick counter
-            std     g_ticks         ; store tick counter
-            jmp     [g_tickvec]     ; chain to tick handler
+            ; Timer 1 interrupt service routine.
+timer1_isr: begin
+                nop                 ; Needed because of error in pcr assembly, above.
+                lda     t1cl	    ; Clear the source of the interrupt.
+                ldd     g_ticks     ; Load,
+                addd    #1          ; increment,
+                std     g_ticks     ; and store tick counter.
+                jmp     [g_tickvec] ; Chain to the tick handler, which may be tick_def.
 
-tick_def:
-            nop                     ; needed because of error in pcr assembly, above
-            rti
+tick_def        entry               ; Default tick handler - does nothing.
+                nop                 ; Needed because of error in pcr assembly, above.
+                rti                 ; Return from interrupt.
+            end

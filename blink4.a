@@ -55,7 +55,7 @@ loop:
           sta	acia_command
 		  ldx	#tick_msg
 		  jsr	outstring
-          PANIC "Test Panic from blink4"
+;          PANIC "Test Panic from blink4"
           bra   loopstart
 		end
 

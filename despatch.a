@@ -2,30 +2,41 @@
 
         include "via6522.i"
         include "globals.i"
-
+		include "panic.i"
+		
         ORG     $0000           ; This is a relocatable module.
 
         ; Initialisation routine to set up the interrupt despatcher.
 init_despatcher:
-                                ; ToDo: set up default ISRs for each vector.
-        ldx	g_irqvec        ; Copy the current IRQ vector
-        stx	g_unknownvec    ; to the "unknown" vector.
-        leax	intdespatch,pcr ; Put the address of the despatcher
-        stx	g_irqvec        ; into the IRQ vector.
-        rts                     ; Done, return to the loader.
+		begin
+									; ToDo: set up default ISRs for each vector.
+			ldx		g_irqvec        ; Copy the current IRQ vector
+			stx		g_unknownvec    ; to the "unknown" vector.
+			leax	intdespatch,pcr ; Put the address of the despatcher
+			stx		g_irqvec        ; into the IRQ vector.
+			rts                     ; Done, return to the loader.
+		end
 
         ; 6522 VIA interrupt despatcher.
 intdespatch:                    ; 6809 IRQ entry point.
-        nop                     ; needed because of error in pcr assembly, above
-        ldx     #g_unknownvec   ; Default to "unknown" vector.
-        lda     ifr             ; Read interrupt flag register.
-        sbpl    out             ; Branch if no interrupts pending.
+		begin
+			nop                     ; needed because of error in pcr assembly, above
+			ldx     #g_unknownvec   ; Default to "unknown" vector.
+			lda     ifr             ; Read interrupt flag register.
+			sbpl    out             ; Branch if no interrupts pending.
 
-        anda    ier             ; Mask with interrupt enable register.
-        ora     #$80            ; Set last bit to ensure default vec.
+			anda    ier             ; Mask with interrupt enable register.
+			ora     #$80            ; Set last bit to ensure default vec.
 
-loop:   leax    -2,x            ; Loop through vectors
-        asra                    ; testing each interrupt bit, LSB first.
-        sbcc    loop            ; Loop unless the bit was set.
+loop:   	leax    -2,x            ; Loop through vectors
+			asra                    ; testing each interrupt bit, LSB first.
+			sbcc    loop            ; Loop unless the bit was set.
 
-out:    jmp     [,x]            ; Jump to the selected interrupt vector.
+out:    	jmp     [,x]            ; Jump to the selected interrupt vector.
+		end
+
+default_isr:
+		begin
+			nop                     ; needed because of error in pcr assembly, above
+			PANIC "Unhandled interrupt"
+		end
