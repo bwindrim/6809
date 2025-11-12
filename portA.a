@@ -1,0 +1,34 @@
+        ; portA.a - read and write functions for 6522 port A
+
+        include "globals.i"
+        include "via6522.i"
+
+        ORG     $0000           ; This is a relocatable module.
+        EXEC    init
+
+        ; Output to port A.
+write:  begin
+            nop                 ; Needed because of error in pcr assembly, above.
+            pshs    y,d         ; Save Y (preserved) and D (return value) registers.
+            tfr     d,y         ; Use Y as the length count.
+            ; Loop over the bytes in the buffer, outputting to port A.
+outer:      lda     ,x+         ; Get next byte.
+            sta     porta       ; Output to port A.
+            ; Wait for "data taken":
+inner:      ldb     ifr         ; Load the Interrupt Flag Register.
+            andb    #ca1flag    ; test CA1 (Port A Data Taken) flag.
+            beq     inner       ; loop if not set.
+            ; The byte has been output, continue.
+            leay    -1,y        ; Decrement length.
+            bne     outer       ; Loop if not zero.
+            ; Done outputting, restore registers.
+            puls    y,d,pc      ; Return, restoring Y and D.
+        end
+
+        ; Initialisation routine to set up stdout and stderr.
+init:   begin
+            leax    write,pcr  ; Copy the address of the stderr handler
+            stx     g_stderr    ; to the stderr vector
+            stx     g_stdout    ; and the stdout vector.
+            rts                 ; Done, return to the loader.
+        end

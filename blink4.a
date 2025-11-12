@@ -44,6 +44,14 @@ loopstart:
           ldd    g_ticks
           std    start
 loop:
+          lda    acia_status
+          anda   #not_dsr
+          beq    not_pressed
+          ldx    #down_msg
+          jsr    outstring
+          
+not_pressed:
+
           ldd    g_ticks
           subd   start
           cmpd   #1000        ; 1000 ticks = 0.5 seconds
