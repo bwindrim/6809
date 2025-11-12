@@ -1,10 +1,7 @@
-		org	$4000
+		ORG 	$4000
+		EXEC	main
 
 		include	"globals.i"
-
-		lds	g_memtop	; set up system stack
-		jmp	main
-
         include "panic.i"
 		include	"init.i"
 		include	"via6522.i"
@@ -18,9 +15,12 @@ stdout:		dw	portastream
 start:      dw  0
 start_msg:  db	"Hello", 13, 10, 0
 tick_msg:	db	"Tick", 13, 10, 0
+down_msg    db  "Button down", 13, 10, 0
+up_msg      db  "Button up", 13, 10, 0
 led:	    db    1
 
-main:		begin
+main:	begin
+          lds	g_memtop	; set up system stack
 
 				; delay loop (~250*1000 iterations)
 				; allows time before setting port A to output
@@ -43,7 +43,7 @@ inner:    leay -1,y
 loopstart:
           ldd    g_ticks
           std    start
-loop:	
+loop:
           ldd    g_ticks
           subd   start
           cmpd   #1000        ; 1000 ticks = 0.5 seconds

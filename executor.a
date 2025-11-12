@@ -1,0 +1,12 @@
+			ORG		$0000		; Relocatable module
+
+			EXEC	init
+
+executor:	begin
+loop:
+				SEIF			; disable interrupts
+				; while run list is not empty
+				;     run tasks
+				CWAI			; no tasks, wait for interrupt
+				bra		loop
+			end
