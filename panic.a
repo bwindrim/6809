@@ -17,7 +17,7 @@ count:      lda     ,x+         ; Get next byte of string.
             addd    #1          ; Increment length counter.
             bra     count
             ; Output the panic string to stderr.
-done:       ldx     10,s        ; Get saved PC from stack again.
+done:       ldx     10,s        ; Get panic string (== saved PC) from stack again.
             jsr     [g_stderr]  ; Output the panic string.
 
 loopstop:   bra loopstop        ; Loop here forever, with interrupts disabled.

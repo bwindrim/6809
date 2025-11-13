@@ -46,7 +46,7 @@ loopstart:
 loop:
           lda    acia_status
           anda   #not_dsr
-          beq    not_pressed
+          bne    not_pressed
           ldx    #down_msg
           jsr    outstring
           
