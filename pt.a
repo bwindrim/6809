@@ -12,7 +12,7 @@ PT_INIT         macro       name
                 endm
 
 PT_BEGIN        macro       name
-?name               begin
+?name                       begin
                     pshs    u       ; save prev frame ptr
                     tfr     s,u     ; copy stack ptr to frame ptr
                     leas    -2,s    ; allocate stack frame (1 byte)
