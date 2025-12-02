@@ -11,6 +11,7 @@ PT_INIT         macro       name
 
 PT_BEGIN        macro       name
 ?name                       begin
+run:                pshs    y
                     jmp     [,x]
 start:
                 endm
@@ -19,7 +20,7 @@ PT_END          macro
                     leay    .start,pcr
                     sty     ,x
                     lda     #PT_ENDED
-                    rts             ; return
+                    puls    y,pc             ; return
                     end
                 endm
 
@@ -28,20 +29,35 @@ PT_YIELD        macro
                 leay        .continue,pcr
                 sty         ,x
                 lda         #PT_YIELDED
-                rts
+                puls    y,pc             ; return
 continue:
                 end
                 endm
 
-task1:          dw  0
-task2:          dw  0
+                ORG     $0000
+                EXEC    main
 
-                leax    task1,pcr
-                PT_INIT     task
-                leax    task2,pcr
-                PT_INIT     task
-
+                ; Test task.
                 PT_BEGIN    task
 loop:           PT_YIELD
                 bra         loop
                 PT_END
+
+                ; Task instances.
+task1:          dw  0
+task2:          dw  0
+
+                ; Main function.
+main:           begin
+                leax    task1,pcr
+                PT_INIT     task
+                leax    task2,pcr
+                PT_INIT     task
+loop:           ; Executor loop.
+                leax        task1,pcr
+                bsr         task.run
+                leax        task2,pcr
+                bsr         task.run
+                bra         loop
+                end
+
