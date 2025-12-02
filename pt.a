@@ -4,8 +4,6 @@ PT_YIELDED      equ         1
 PT_EXITED       equ         2
 PT_ENDED        equ         3
 
-PT_YIELD_FLAG   equ         0       ; frame offset for PT_YIELD_FLAG
-
 PT_INIT         macro       name
                     leay     ?name.start,pcr
                     sty     ,x
@@ -13,23 +11,14 @@ PT_INIT         macro       name
 
 PT_BEGIN        macro       name
 ?name                       begin
-                    pshs    u       ; save prev frame ptr
-                    tfr     s,u     ; copy stack ptr to frame ptr
-                    leas    -1,s    ; allocate stack frame (1 byte)
-                    lda     #1
-                    sta     PT_YIELD_FLAG,u
                     jmp     [,x]
 start:
                 endm
 
 PT_END          macro
-                    lda     #0      ; PT_YIELD_FLAG = 0
-                    sta     PT_YIELD_FLAG,u
                     leay    .start,pcr
                     sty     ,x
-                    tfr     u,s     ; copy frame ptr back to stack ptr
                     lda     #PT_ENDED
-                    puls    u       ; restore prev frame ptr
                     rts             ; return
                     end
                 endm
@@ -38,9 +27,7 @@ PT_YIELD        macro
                 begin
                 leay        .continue,pcr
                 sty         ,x
-                tfr     u,s     ; copy frame ptr back to stack ptr
                 lda         #PT_YIELDED
-                puls        u
                 rts
 continue:
                 end
