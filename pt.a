@@ -34,10 +34,13 @@ PT_END          macro
                     end
                 endm
 
-task:           dw  0
+task1:          dw  0
+task2:          dw  0
 
-                leax    task,pcr
-                PT_INIT     task1
+                leax    task1,pcr
+                PT_INIT     task
+                leax    task2,pcr
+                PT_INIT     task
 
-                PT_BEGIN    task1
+                PT_BEGIN    task
                 PT_END
