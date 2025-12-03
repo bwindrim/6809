@@ -25,7 +25,8 @@ PT_END          macro
 
 PT_YIELD        macro
                 begin
-                leay        .continue,pcr
+;                leay        .continue,pcr
+                ldy         #.continue   ; NOTE: not position-independent!
                 sty         ,x
                 lda         #PT_YIELDED
                 puls    y,pc             ; return
