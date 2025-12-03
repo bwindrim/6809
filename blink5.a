@@ -1,0 +1,76 @@
+		ORG 	$4000
+		EXEC	main
+
+		include	"globals.i"
+        include "panic.i"
+		include	"via6522.i"
+		include	"acia6551.i"
+
+start:      dw  0
+start_msg:  db	"Hello!", 13, 10, 0
+tick_msg:	db	"Tick", 13, 10, 0
+down_msg    db  "Button down", 13, 10, 0
+up_msg      db  "Button up", 13, 10, 0
+led:	    db    1
+
+main:	begin
+          lds	g_memtop	; set up system stack
+
+				; delay loop (~250*1000 iterations)
+				; allows time before setting port A to output
+delay:	  ldx	#250
+outer:    ldy	#1000
+inner:    leay -1,y
+		  bne	inner
+		  leax -1,x
+		  bne	outer
+
+		  lda	#$FF
+		  sta	ddra ; set port A to output
+		  lda	#@00001000		; set PCR to 00001000 (CB2 input -ve edge, CB1 -ve edge, CA2 handshake output, CA1 -ve edge)
+		  sta	pcr
+
+          clif                  ; enable interrupts
+		  ldx	#start_msg
+		  jsr	outstring
+
+loopstart:
+          ldd    g_ticks
+          std    start
+loop:
+          lda    acia_status
+          anda   #not_dsr
+          bne    not_pressed
+          ldx    #down_msg
+          jsr    outstring
+          
+not_pressed:
+
+          ldd    g_ticks
+          subd   start
+          cmpd   #1000        ; 1000 ticks = 0.5 seconds
+          blo	loop            ; unsigned "less than" branch
+;          PANIC "After loop"
+          lda	led
+          eora	#1
+          sta	led
+          sta	acia_command
+		  ldx	#tick_msg
+		  jsr	outstring
+;          PANIC "Test Panic from blink4"
+          bra   loopstart
+		end
+
+outstring:	begin
+            ; Count the length of the string.
+            ldd     #0          ; Clear D (length counter).
+            pshs    x
+count:      lda     ,x+         ; Get next byte of string.
+            beq     done        ; Is this the end of the string?
+            addd    #1          ; Increment length counter.
+            bra     count
+            ; Output the panic string to stderr.
+done:       puls    x
+            jsr     [g_stdout]  ; Output the panic string.
+out:		rts
+		end
