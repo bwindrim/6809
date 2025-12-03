@@ -34,6 +34,23 @@ continue:
                 end
                 endm
 
+PT_WAIT         macro
+                begin
+                leay        .continue,pcr
+                sty         ,x
+                lda         #PT_WAITING
+                puls    y,pc             ; return
+continue:
+                end
+                endm
+
+PT_EXIT         macro
+                leay        .start,pcr
+                sty         ,x
+                lda         #PT_EXITED
+                puls        y,pc
+                endm
+
                 ORG     $0000
                 EXEC    main
 
