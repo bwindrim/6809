@@ -8,8 +8,10 @@
         include "pt.i"
 
 led_ms      equ 1000    ; on/off time for LED task, 1000 ticks = 1 second
+debounce_ms equ 10      ; debounce time for pushbutton, 10 ticks = 10ms
 
 start_tick: dw  0
+debounce_tick: dw  0
 start_msg:  db	"Hello!", 13, 10, 0
 on_msg:	    db	"On", 13, 10, 0
 off_msg:	db	"Off", 13, 10, 0
@@ -32,7 +34,7 @@ loop:
           blo	loop            ; unsigned "less than" branch
           end
           
-          lda	#1              ; turn the LED off
+          lda	#3              ; turn the LED off
           sta	acia_command
           pshs  x
 		  ldx	#off_msg        ; and print the "off" message
@@ -51,7 +53,7 @@ loop:
           blo	loop            ; unsigned "less than" branch
           end
           
-          lda	#0              ; turn the LED on
+          lda	#2              ; turn the LED on
           sta	acia_command
           pshs  x
 		  ldx	#on_msg         ; and print the "on" message
@@ -61,14 +63,74 @@ loop:
           jmp   loopstart
                 PT_END      ; led_task
 
+            ; Pushbutton polling task.
+            PT_BEGIN    button_task
+            ; wait for button down
+loopstart:
+not_pressed:
+            PT_YIELD
+            lda    acia_status
+            anda   #not_dsr
+            bne    not_pressed
+            ; print button down message
+            pshs  x
+            ldx    #down_msg
+            jsr    outstring
+            puls    x
+
+            ; debounce delay
+            begin
+            ldd    g_ticks
+            std    debounce_tick
+loop:
+            PT_YIELD
+            ldd    g_ticks
+            subd   debounce_tick
+            cmpd   #debounce_ms
+            blo	loop            ; unsigned "less than" branch
+            end
+          
+still_pressed:
+            PT_YIELD
+            lda    acia_status
+            anda   #not_dsr
+            beq    still_pressed
+
+            pshs    x
+            ldx     #up_msg
+            jsr     outstring
+            puls    x        
+            ; debounce delay
+            begin
+            ldd    g_ticks
+            std    debounce_tick
+loop:
+            PT_YIELD
+            ldd    g_ticks
+            subd   debounce_tick
+            cmpd   #debounce_ms
+            blo	loop            ; unsigned "less than" branch
+            end
+          
+            jmp     loopstart
+
+            PT_END          ; button_task
+
+
                 ; Task instances.
 task1:          dw  0
 task2:          dw  0
 
+acia_isr:
+           lda     acia_status  ; clear interrupts
+           rti
+
 
 main:	begin
           lds	g_memtop	; set up system stack
-
+          ldx   #acia_isr
+          stx   g_unknownvec
+          
 				; delay loop (~250*1000 iterations)
 				; allows time before setting port A to output
 delay:	  ldx	#250
@@ -85,8 +147,8 @@ inner:    leay -1,y
 
         ldx    #task1 ; not position-independent
         PT_INIT     led_task
-;        leax    task2,pcr
-;        PT_INIT     task
+        ldx    #task2
+        PT_INIT     button_task
 
           clif                  ; enable interrupts
 		  ldx	#start_msg
@@ -95,8 +157,8 @@ inner:    leay -1,y
 loop:           ; Executor loop.
         ldx        #task1  ; not position-independent
         jsr         led_task.run ; not position-independent
-;        leax        task2,pcr
-;        bsr         button_task.run
+        ldx        #task2
+        jsr         button_task.run
         jmp         loop ; not position-independent
         end     ; of main
 
