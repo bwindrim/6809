@@ -10,7 +10,6 @@
         ; 6522 VIA interrupt despatcher.
 intdespatch:                    ; 6809 IRQ entry point.
 		begin
-			nop                     ; needed because of error in pcr assembly, above
 			ldx     #g_unknownvec   ; Default to "unknown" vector.
 			lda     ifr             ; Read interrupt flag register.
 			sbpl    out             ; Branch if no interrupts pending.
@@ -27,7 +26,6 @@ out:    	jmp     [,x]            ; Jump to the selected interrupt vector.
 
 default_isr:
 		begin
-			nop                     ; needed because of error in pcr assembly, above
 			PANIC "Unhandled interrupt"
 		end
 
@@ -35,7 +33,7 @@ default_isr:
 init_despatcher:
 		begin
 									; ToDo: set up default ISRs for each vector.
-			ldx		g_irqvec        ; Copy the current IRQ vector
+			leax	default_isr,pcr        ; Copy the current IRQ vector
 			stx		g_unknownvec    ; to the "unknown" vector.
 			leax	intdespatch,pcr ; Put the address of the despatcher
 			stx		g_irqvec        ; into the IRQ vector.
