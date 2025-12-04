@@ -7,12 +7,14 @@
 		include	"acia6551.i"
         include "pt.i"
 
+led_ms      equ 1000    ; on/off time for LED task, 1000 ticks = 1 second
+
 start_tick: dw  0
 start_msg:  db	"Hello!", 13, 10, 0
-tick_msg:	db	"Tick", 13, 10, 0
+on_msg:	    db	"On", 13, 10, 0
+off_msg:	db	"Off", 13, 10, 0
 down_msg    db  "Button down", 13, 10, 0
 up_msg      db  "Button up", 13, 10, 0
-led:	    db    0
 
                 ; LED task.
                 PT_BEGIN    led_task
@@ -20,19 +22,39 @@ led:	    db    0
 loopstart:
           ldd    g_ticks
           std    start_tick
+
+          begin
 loop:
           PT_YIELD
           ldd    g_ticks
           subd   start_tick
-          cmpd   #1000        ; 1000 ticks = 1 second
+          cmpd   #led_ms
           blo	loop            ; unsigned "less than" branch
-
-          lda	led
-          eora	#1
-          sta	led
+          end
+          
+          lda	#1              ; turn the LED off
           sta	acia_command
           pshs  x
-		  ldx	#tick_msg
+		  ldx	#off_msg        ; and print the "off" message
+		  jsr	outstring
+          puls  x
+
+          ldd    g_ticks
+          std    start_tick
+
+          begin
+loop:
+          PT_YIELD
+          ldd    g_ticks
+          subd   start_tick
+          cmpd   #led_ms
+          blo	loop            ; unsigned "less than" branch
+          end
+          
+          lda	#0              ; turn the LED on
+          sta	acia_command
+          pshs  x
+		  ldx	#on_msg         ; and print the "on" message
 		  jsr	outstring
           puls  x
 ;          PANIC "In led_task, after LED toggle"
