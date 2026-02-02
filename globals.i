@@ -35,5 +35,9 @@ g_ticks         equ	$FFDC   ; rolling tick counter
 g_stderr      equ	$FFDA   ; standard error procedure address
 g_stdout      equ	$FFD8   ; standard output procedure address
 g_stdin       equ	$FFD6   ; standard input procedure address
+
+        ; Shift register globals.
+g_shiftout    equ	$FFD4   ; shift register procedure address
+
         ; General globals.
 g_base          equ	$FFC0   ; base address for globals

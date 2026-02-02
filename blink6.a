@@ -1,0 +1,193 @@
+		ORG 	$4000
+		EXEC	main
+
+		include	"globals.i"
+        include "panic.i"
+		include	"via6522.i"
+		include	"acia6551.i"
+        include "pt.i"
+
+led_ms      equ 1000    ; on/off time for LED task, 1000 ticks = 1 second
+debounce_ms equ 10      ; debounce time for pushbutton, 10 ticks = 10ms
+
+start_tick: dw  0
+debounce_tick: dw  0
+start_msg:  db	"Hello!", 13, 10, 0
+on_msg:	    db	"On", 13, 10, 0
+off_msg:	db	"Off", 13, 10, 0
+down_msg    db  "Button down", 13, 10, 0
+up_msg      db  "Button up", 13, 10, 0
+on_colours:
+red         db  128, 0, 0
+green       db  0, 128, 0
+blue        db  0, 0, 128
+white       db  128, 128, 128
+off_colours:
+cyan        db  0, 128, 128
+magenta     db  128, 0, 128
+yellow      db  128, 128, 0
+black       db 0, 0, 0
+
+                ; LED task.
+                PT_BEGIN    led_task
+
+loopstart:
+          ldd    g_ticks
+          std    start_tick
+
+          begin
+loop:
+          PT_YIELD
+          ldd    g_ticks
+          subd   start_tick
+          cmpd   #led_ms
+          blo	loop            ; unsigned "less than" branch
+          end
+          
+          lda	#3              ; turn the LED off
+          sta	acia_command
+          pshs  x
+          ldx   #off_colours
+          ldd   #12
+          jsr   [g_shiftout]
+		  ldx	#off_msg        ; and print the "off" message
+		  jsr	outstring
+          puls  x
+
+          ldd    g_ticks
+          std    start_tick
+
+          begin
+loop:
+          PT_YIELD
+          ldd    g_ticks
+          subd   start_tick
+          cmpd   #led_ms
+          blo	loop            ; unsigned "less than" branch
+          end
+          
+          lda	#2              ; turn the LED on
+          sta	acia_command
+          pshs  x
+          ldx   #on_colours
+          ldd   #12
+          jsr   [g_shiftout]
+		  ldx	#on_msg         ; and print the "on" message
+		  jsr	outstring
+          puls  x
+;          PANIC "In led_task, after LED toggle"
+          jmp   loopstart
+                PT_END      ; led_task
+
+            ; Pushbutton polling task.
+            PT_BEGIN    button_task
+            ; wait for button down
+loopstart:
+not_pressed:
+            PT_YIELD
+            lda    acia_status
+            anda   #not_dsr
+            bne    not_pressed
+            ; print button down message
+            pshs  x
+            ldx    #down_msg
+            jsr    outstring
+            puls    x
+
+            ; debounce delay
+            begin
+            ldd    g_ticks
+            std    debounce_tick
+loop:
+            PT_YIELD
+            ldd    g_ticks
+            subd   debounce_tick
+            cmpd   #debounce_ms
+            blo	loop            ; unsigned "less than" branch
+            end
+          
+still_pressed:
+            PT_YIELD
+            lda    acia_status
+            anda   #not_dsr
+            beq    still_pressed
+
+            pshs    x
+            ldx     #up_msg
+            jsr     outstring
+            puls    x        
+            ; debounce delay
+            begin
+            ldd    g_ticks
+            std    debounce_tick
+loop:
+            PT_YIELD
+            ldd    g_ticks
+            subd   debounce_tick
+            cmpd   #debounce_ms
+            blo	loop            ; unsigned "less than" branch
+            end
+          
+            jmp     loopstart
+
+            PT_END          ; button_task
+
+
+                ; Task instances.
+task1:          dw  0
+task2:          dw  0
+
+acia_isr:
+           lda     acia_status  ; clear interrupts
+           rti
+
+
+main:	begin
+          lds	g_memtop	; set up system stack
+          ldx   #acia_isr
+          stx   g_unknownvec
+          
+				; delay loop (~250*1000 iterations)
+				; allows time before setting port A to output
+delay:	  ldx	#250
+outer:    ldy	#1000
+inner:    leay -1,y
+		  bne	inner
+		  leax -1,x
+		  bne	outer
+
+		  lda	#$FF
+		  sta	ddra ; set port A to output
+		  lda	#@00001000		; set PCR to 00001000 (CB2 input -ve edge, CB1 -ve edge, CA2 handshake output, CA1 -ve edge)
+		  sta	pcr
+
+        ldx    #task1 ; not position-independent
+        PT_INIT     led_task
+        ldx    #task2
+        PT_INIT     button_task
+
+          clif                  ; enable interrupts
+		  ldx	#start_msg
+		  jsr	outstring ; not position-independent
+
+loop:           ; Executor loop.
+        ldx        #task1  ; not position-independent
+        jsr         led_task.run ; not position-independent
+        ldx        #task2
+        jsr         button_task.run
+        jmp         loop ; not position-independent
+        end     ; of main
+
+outstring:	begin
+            ; Count the length of the string.
+            ldd     #0          ; Clear D (length counter).
+            pshs    x
+count:      lda     ,x+         ; Get next byte of string.
+            beq     done        ; Is this the end of the string?
+            addd    #1          ; Increment length counter.
+            bra     count
+            ; Output the panic string to stderr.
+done:       puls    x
+            jsr     [g_stdout]  ; Output the panic string.
+out:		rts
+		end
