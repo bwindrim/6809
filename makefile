@@ -1,7 +1,7 @@
 # Makefile to assemble .a files into .ex9 files using as6809
 
 AS=as6809
-SRC=boot2.a despatch.a timer1.a panic.a portA.a shiftreg.a blink7.a
+SRC=boot2.a despatch.a timer1.a panic.a portA.a shiftreg.a blink8.a
 INC=via6522.i globals.i panic.i
 OBJ=$(SRC:.a=.ex9)
 
@@ -19,7 +19,7 @@ portA.ex9: portA.a via6522.i globals.i
 
 shiftreg.ex9: shiftreg.a via6522.i globals.i
 
-blink7.ex9: blink7.a panic.i via6522.i globals.i acia6551.i
+blink8.ex9: blink8.a panic.i via6522.i globals.i acia6551.i
 
 
 %.ex9: %.a

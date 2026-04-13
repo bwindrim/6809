@@ -1,0 +1,315 @@
+		ORG 	$4000
+		EXEC	main
+
+		include	"globals.i"
+        include "panic.i"
+		include	"via6522.i"
+		include	"acia6551.i"
+        include "pt.i"
+
+led_ms      equ 1000    ; on/off time for LED task, 1000 ticks = 1 second
+debounce_ms equ 10      ; debounce time for pushbutton, 10 ticks = 10ms
+
+start_tick: dw  0
+debounce_tick: dw  0
+start_msg:  db	"Hello!", 13, 10, 0
+on_msg:	    db	"On", 13, 10, 0
+off_msg:	db	"Off", 13, 10, 0
+down_msg    db  "Button down", 13, 10, 0
+up_msg      db  "Button up", 13, 10, 0
+on_colours:
+red         db  1, 0, 0
+green       db  0, 1, 0
+blue        db  0, 0, 1
+white       db  0, 0, 0
+off_colours:
+cyan        db  0, 1, 1
+magenta     db  1, 0, 1
+yellow      db  1, 1, 0
+black       db 0, 0, 0
+
+colour_buf: ds 12
+colour_val: db 0
+colour_inc  equ 16
+
+rgb_mul:    begin
+                pshs    a,b
+                pshs    a
+                ldb     0,x
+                mul
+                stb     0,y
+                puls    a
+                pshs    a
+                ldb     1,x
+                mul
+                stb     1,y
+                puls    a
+                pshs    a
+                ldb     2,x
+                mul
+                stb     2,y
+                puls    a
+                puls    a,b,pc      ; return
+            end
+
+colour_mul: begin
+                pshs    x,y
+                bsr     rgb_mul
+                leax    3,x
+                leay    3,y
+                bsr     rgb_mul
+                leax    3,x
+                leay    3,y
+                bsr     rgb_mul
+                leax    3,x
+                leay    3,y
+                bsr     rgb_mul
+                puls    x,y,pc
+            end
+
+                ; LED task.
+                PT_BEGIN    led_task
+
+loopstart:
+          ldd    g_ticks
+          std    start_tick
+
+          begin
+loop:
+          PT_YIELD
+          ldd    g_ticks
+          subd   start_tick
+          cmpd   #led_ms
+          blo	loop            ; unsigned "less than" branch
+          end
+          
+          lda	#3              ; turn the LED off
+          sta	acia_command
+ 
+          pshs  x
+          ldy   #colour_buf
+          ldx   #on_colours
+          lda   colour_val               ; multiply by colour_val (0-255)
+          bsr   colour_mul
+
+          ldx   #colour_buf
+          ldd   #12
+          jsr   [g_shiftout]
+		  ldx	#off_msg        ; and print the "off" message
+		  jsr	outstring
+          puls  x
+
+          ldd    g_ticks
+          std    start_tick
+
+          begin
+loop:
+          PT_YIELD
+          ldd    g_ticks
+          subd   start_tick
+          cmpd   #led_ms
+          blo	loop            ; unsigned "less than" branch
+          end
+          
+          lda	#2              ; turn the LED on
+          sta	acia_command
+
+          pshs  x
+          ldy   #colour_buf
+          ldx   #on_colours
+          lda   colour_val      ; multiply by colour_val (0-255)
+          bsr   colour_mul
+
+          ldx   #colour_buf
+          ldd   #12
+          jsr   [g_shiftout]
+		  ldx	#on_msg         ; and print the "on" message
+		  jsr	outstring
+          puls  x
+
+;          PANIC "In led_task, after LED toggle"
+          jmp   loopstart
+                PT_END      ; led_task
+
+            ; Pushbutton polling task.
+            PT_BEGIN    button_task
+            ; wait for button down
+loopstart:
+not_pressed:
+            PT_YIELD
+            lda    acia_status
+            anda   #not_dsr
+            bne    not_pressed
+            ; print button down message
+            pshs  x
+            ldx    #down_msg
+            jsr    outstring
+            puls    x
+
+            ; debounce delay
+            begin
+            ldd    g_ticks
+            std    debounce_tick
+loop:
+            PT_YIELD
+            ldd    g_ticks
+            subd   debounce_tick
+            cmpd   #debounce_ms
+            blo	loop            ; unsigned "less than" branch
+            end
+          
+still_pressed:
+            PT_YIELD
+            lda    acia_status
+            anda   #not_dsr
+            beq    still_pressed
+
+            pshs    x
+            ldx     #up_msg
+            jsr     outstring
+            puls    x
+            
+            lda     colour_val
+            adda    #colour_inc              ; increase colour_val by a constant (wraps around at 256)
+            sta     colour_val
+
+            ; debounce delay
+            begin
+            ldd    g_ticks
+            std    debounce_tick
+loop:
+            PT_YIELD
+            ldd    g_ticks
+            subd   debounce_tick
+            cmpd   #debounce_ms
+            blo	loop            ; unsigned "less than" branch
+            end
+          
+            jmp     loopstart
+
+            PT_END          ; button_task
+
+
+                ; Task instances.
+task1:          dw  0
+task2:          dw  0
+
+acia_isr:
+           lda     acia_status  ; clear interrupts
+           rti
+
+        begin
+hex_table:  db  "0123456789ABCDEF"
+
+print_hex   entry       ; Print the byte in A as two hex digits to stdout, followed by a space.
+            pshs    x,y,a,b
+            ldy     #hex_table
+
+            pshs    a          ; Save original byte in A.
+            tfr     a,b         ; B = original byte
+            lsrb
+            lsrb
+            lsrb
+            lsrb              ; high nibble
+            lda     b,y
+            sta     0,x
+            leax    1,x
+
+            puls    a          ; restore original byte
+            anda    #$0F       ; low nibble
+            lda     a,y
+            sta     0,x
+            leax    1,x
+
+            lda     #' '
+            sta     0,x
+            leax    1,x
+            clra
+            sta     0,x
+
+            puls    x,y,a,b,pc     ; return
+        end
+
+        begin
+hex_buf:    ds  4
+nl_msg:     db  13, 10, 0
+
+print_mem   entry
+            pshs    x,y,u,a,b
+            tfr     x,u          ; U = source pointer
+
+            ldy     #16          ; 16 lines
+line_loop:
+            ldb     #16          ; 16 bytes per line
+byte_loop:
+            lda     ,u+
+            ldx     #hex_buf
+            jsr     print_hex
+            pshs    b
+            ldd     #3
+            jsr     [g_stdout]  ; print the hex byte
+            puls    b
+            decb
+            bne     byte_loop
+
+            ldx     #nl_msg
+            ldd     #2
+            jsr     [g_stdout]  ; print newline
+            leay    -1,y
+            bne     line_loop
+
+            puls    b,a,u,y,x,pc
+        end
+
+main:	begin
+          lds	g_memtop	; set up system stack
+          ldx   #acia_isr
+          stx   g_unknownvec
+          
+				; delay loop (~250*1000 iterations)
+				; allows time before setting port A to output
+delay:	  ldx	#250
+outer:    ldy	#1000
+inner:    leay -1,y
+		  bne	inner
+		  leax -1,x
+		  bne	outer
+
+		  lda	#$FF
+		  sta	ddra ; set port A to output
+		  lda	#@00001000		; set PCR to 00001000 (CB2 input -ve edge, CB1 -ve edge, CA2 handshake output, CA1 -ve edge)
+		  sta	pcr
+
+        ldx    #task1 ; not position-independent
+        PT_INIT     led_task
+        ldx    #task2
+        PT_INIT     button_task
+
+          clif                  ; enable interrupts
+		  ldx	#start_msg
+		  jsr	outstring ; not position-independent
+          ldx   #$FF00
+          jsr   print_mem
+          
+
+loop:           ; Executor loop.
+        ldx        #task1  ; not position-independent
+        jsr         led_task.run ; not position-independent
+        ldx        #task2
+        jsr         button_task.run
+        jmp         loop ; not position-independent
+        end     ; of main
+
+outstring:	begin
+            ; Count the length of the string.
+            ldd     #0          ; Clear D (length counter).
+            pshs    x
+count:      lda     ,x+         ; Get next byte of string.
+            beq     done        ; Is this the end of the string?
+            addd    #1          ; Increment length counter.
+            bra     count
+            ; Output the panic string to stderr.
+done:       puls    x
+            jsr     [g_stdout]  ; Output the panic string.
+out:		rts
+		end
