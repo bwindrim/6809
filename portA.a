@@ -8,7 +8,6 @@
 
         ; Output to port A.
 write:  begin
-            nop                 ; Needed because of error in pcr assembly, above.
             pshs    y,d         ; Save Y (preserved) and D (return value) registers.
             tfr     d,y         ; Use Y as the length count.
             ; Loop over the bytes in the buffer, outputting to port A.
@@ -27,7 +26,7 @@ inner:      ldb     ifr         ; Load the Interrupt Flag Register.
 
         ; Initialisation routine to set up stdout and stderr.
 init:   begin
-            leax    write,pcr  ; Copy the address of the stderr handler
+            leax    write,pcr   ; Copy the address of the stderr handler
             stx     g_stderr    ; to the stderr vector
             stx     g_stdout    ; and the stdout vector.
             rts                 ; Done, return to the loader.

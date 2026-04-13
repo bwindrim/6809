@@ -55,6 +55,7 @@ T2_COUNT_PB6	    equ	@00100000
 T1_ONE_SHOT   	    equ	@00000000
 T1_CONTINUOUS	    equ	@01000000
 T1_PB7      	    equ	@10000000
+ACR_SHIFT_MASK      equ	@11100011
 
 ; Interrupt Flag Register (IFR) and Interrupt Enable Register (IER) bits
 ca2flag		equ	@00000001
