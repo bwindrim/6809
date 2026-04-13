@@ -1,0 +1,32 @@
+{
+	"folders": [
+		{
+			"path": "../assassin"
+		},
+		{
+			"name": "6809",
+			"path": "."
+		},
+		{
+			"name": "6809-support",
+			"path": "../6809-support"
+		},
+		{
+			"name": "PicoPython",
+			"path": "../PicoPython"
+		},
+		{
+			"name": "heatshrink-1",
+			"path": "../heatshrink-1"
+		},
+		{
+			"name": "Mpy Remote Workspace",
+			"uri": "pico:"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"cstdio": "c"
+		}
+	}
+}
