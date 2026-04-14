@@ -3,12 +3,12 @@
 loop1:		lda	$EFFF,x
 		sta	$EFFF,x
 		leax	-1,x
-		bne	loop1
+		sbne	loop1
 		ldx #256
 loop2:		lda	$FEFF,x
 		sta	$FEFF,x
 		leax	-1,x
-		bne	loop2
+		sbne	loop2
 		lda	#$FE	; point the DP reg to the I/O register space
 		exg	a,dp
 		lda	#0		; set DDRA to input
@@ -22,7 +22,7 @@ loop2:		lda	$FEFF,x
 loop3:		ldu	#getbyte
 		exg	u,pc
 		cmpb	#$AA
-		bne	loop3
+		sbne	loop3
 dload:		ldu	#getword
 		exg	u,pc
 		exg	d,x
@@ -31,24 +31,24 @@ dload:		ldu	#getword
 		exg	d,y
 		leay	1,y
 loop4:		leay	-1,y
-		beq	exit
+		sbeq	exit
 		ldu	#getbyte
 		exg	u,pc
 		stb	,x+
-		bra	loop4
+		sbra	loop4
 exit:		ldu	#getword
 		exg	u,pc
 		exg	d,pc
 int:		rti
 getword:	lda	<$0D	; load A from IFR
 		anda	#2		; test CA1 flag
-		beq	getword		; loop if CA1 not set
+		sbeq	getword		; loop if CA1 not set
 		lda	<1			; load A from IRA
 		sta	<0			; store A to ORB (blind echo)
 		; fall through
 getbyte:	ldb	<$0D	; load A from IFR
 		andb	#2		; test CA1 flag
-		beq	getbyte		; loop if CA1 not set
+		sbeq	getbyte		; loop if CA1 not set
 		ldb	<1			; load A from IRA
 		stb	<0			; store A to ORB (blind echo)
 		exg	u,pc		; return via link address in u
